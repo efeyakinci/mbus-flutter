@@ -18,8 +18,6 @@ import 'package:bitmap/bitmap.dart';
 import 'package:mbus/settings/Settings.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/mbus_utils.dart';
-import 'package:mbus/test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';

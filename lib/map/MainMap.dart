@@ -225,13 +225,9 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
   };
 
   BitmapDescriptor getBusImage(String routeId) {
-    if (busImages.containsKey(routeId)) {
-      return busImages[routeId] ??
-          BitmapDescriptor
-              .defaultMarker;
-    } else {
-      return BitmapDescriptor.defaultMarker;
-    }
+    return busImages[routeId] ??
+        BitmapDescriptor
+            .defaultMarker;
   }
 
   // Takes in some data with a routeId and returns the subset of that data that is selected
