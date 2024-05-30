@@ -2,6 +2,32 @@
 
 ## Building MBus
 
+### Prerequisites
+
+1. **Install Flutter**:
+   Follow the instructions on the [official Flutter website](https://docs.flutter.dev/get-started/install) to install Flutter on your machine.
+
+2. **Install Dart**:
+   Dart comes with Flutter, but make sure you have the latest version. You can check the version with:
+   ```bash
+   dart --version
+   ```
+
+### Installing Dependencies
+
+Before building the project, you need to install the required dependencies.
+
+1. Navigate to the project directory:
+   ```bash
+   cd path/to/your/mbus/project
+   ```
+
+2. Install Flutter dependencies:
+   ```bash
+   flutter pub get
+   ```
+
+
 ### Functional Widgets
 
 MBus uses flutter_functional_widget to write new widgets. This package works by using the build_runner dependency to generate the widget code.
