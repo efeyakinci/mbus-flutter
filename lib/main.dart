@@ -433,8 +433,6 @@ class _NavigationContainerState extends State<NavigationContainer> {
   @override
   Widget build(BuildContext context) {
     return (Scaffold(
-      // No app bar
-      // AppBar(title: Center(child: Image.asset('assets/mbus_logo_JOKE.png', height: 96,)),),
       body: IndexedStack(
         children: [
           MainMap(widget._selectedRoutes.toSet()),
