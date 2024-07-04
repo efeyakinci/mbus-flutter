@@ -25,6 +25,8 @@ import 'package:flutter_phoenix/flutter_phoenix.dart';
 
 
 void main() {
+
+  // start logging
   Logger.root.level = Level.INFO;
   Logger.root.onRecord.listen((record) {
     print('[${record.level.name}] ${record.time}: ${record.message}');
@@ -52,19 +54,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Phoenix(
-        child: MaterialApp(
-      title: 'MBus',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
+      child: MaterialApp(
+        title: 'MBus',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
           primaryColor: Colors.white,
           appBarTheme: AppBarTheme(
             backgroundColor: Colors.white,
             iconTheme: IconThemeData(
-              color: Colors.black, //change your color here
+              color: Colors.black,
             ),
-          )),
-      home: DefaultTabController(length: 3, child: OnBoardingSwitcher()),
-    ));
+          )
+        ),
+        home: DefaultTabController(
+          length: 3, 
+          child: OnBoardingSwitcher()
+        ),
+      )
+    );
   }
 }
 
@@ -72,9 +79,10 @@ class OnBoardingSwitcher extends StatefulWidget {
   createState() => _OnBoardingSwitcherState();
 }
 
-class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
-    with WidgetsBindingObserver {
-  bool _hasBeenOnboardedReturned = false;
+// "WidgetsBindingObserver" allows the app to reload when it is out of and back in focus
+class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBindingObserver {
+  // variable declarations
+  bool _hasOnboardingStatusBeenChecked = false;
   bool _hasBeenOnboarded = false;
   bool _hasCheckedNewAssets = false;
   bool _currentlyCheckingAssets = false;
@@ -84,23 +92,34 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
   GlobalConstants globalConstants = GlobalConstants();
   final log = new Logger("main.dart");
 
+  // determines whether onboarding has occurred
   Future<void> _checkIfOnboarded() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // update the state and determine whether onboarding has occurred
     setState(() {
-      _hasBeenOnboardedReturned = true;
       _hasBeenOnboarded = prefs.getBool("onboarded") ?? false;
+      _hasOnboardingStatusBeenChecked = true;
     });
+
     if (_hasBeenOnboarded) {
       _checkMessages();
     }
   }
 
+  // this runs after the onboarding sequence and mainly just requests location permission
   Future<void> _onBoardingComplete() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     LocationPermission permission;
+
+    // if location services exist on the device
     if (await Geolocator.isLocationServiceEnabled()) {
       permission = await Geolocator.checkPermission();
+
+      // if the permission is denied
       if (permission == LocationPermission.denied) {
+        // request permission (note: will only ask once)
+        //                     > TODO: make it ask every time you hit the button
         permission = await Geolocator.requestPermission();
       }
     }
@@ -351,6 +370,7 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
     });
   }
 
+  // initialization of app
   @override
   void initState() {
     super.initState();
@@ -367,7 +387,8 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasBeenOnboardedReturned || !_isLoaded) {
+    // if we haven't checked for onboarding or the data isn't loaded, put up the loading screen
+    if (!_hasOnboardingStatusBeenChecked || !_isLoaded) {
       return Scaffold(
         body: Center(
           child: Column(
@@ -381,22 +402,21 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
               CircularProgressIndicator(color: MICHIGAN_MAIZE),
               SizedBox(height: 10),
               Text("Loading funny bus pictures",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               SizedBox(height: 10),
               SelectableText(
-                  "If assets do not load, check www.efeakinci.com/mbus for updates.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey))
+                "If assets do not load, check www.efeakinci.com/mbus for updates.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey))
             ],
           ),
         ),
       );
+    } else if (_hasBeenOnboarded) {
+      return NavigationContainer(selectedRoutes);
     } else {
-      if (_hasBeenOnboarded) {
-        return NavigationContainer(selectedRoutes);
-      } else {
-        return OnBoardingScreen(_onBoardingComplete);
-      }
+      // run onboarding sequence, and _onBoardingComplete after
+      return OnBoardingScreen(_onBoardingComplete);
     }
   }
 }
@@ -430,9 +450,10 @@ class _NavigationContainerState extends State<NavigationContainer> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
+  // main home screen 
   @override
   Widget build(BuildContext context) {
-    return (Scaffold(
+    return Scaffold(
       body: IndexedStack(
         children: [
           MainMap(widget._selectedRoutes.toSet()),
@@ -448,15 +469,13 @@ class _NavigationContainerState extends State<NavigationContainer> {
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.map), label: "Live Map"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.favorite), label: "Favorites"),
-          BottomNavigationBarItem(
-              icon: Icon(CupertinoIcons.doc_plaintext), label: "More")
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorites"),
+          BottomNavigationBarItem(icon: Icon(CupertinoIcons.doc_plaintext), label: "More")
         ],
         onTap: _onItemSelected,
         currentIndex: _currentIndex,
         selectedItemColor: MICHIGAN_BLUE,
       ),
-    ));
+    );
   }
 }
