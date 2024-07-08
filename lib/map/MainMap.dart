@@ -97,7 +97,8 @@ Widget mainGmap(
       myLocationButtonEnabled: false,
       minMaxZoomPreference: new MinMaxZoomPreference(11, 100),
       myLocationEnabled: showMyLocation,
-      polylines: polylines);
+      polylines: polylines
+  );
 }
 
 // Android version of the map (needs to use MarkerAnimator to animate markers)
@@ -511,24 +512,24 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
   return AnnotatedRegion(
     value: SystemUiOverlayStyle.dark,
     child: (Container(
-        child: Stack(
-      children: [
-        Platform.isIOS
-            ? MainGmap(
-                mapController.value,
-                dynamicMarkers.value.union(staticMarkers.value),
-                polylines.value,
-                showMyLocation.value,
-                setMapRotation)
-            : MainAndroidMap(
-                mapController.value,
-                polylines.value,
-                staticMarkers.value,
-                dynamicMarkers.value,
-                showMyLocation.value,
-                setMapRotation),
-        SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation))
-      ],
+      child: Stack(
+        children: [
+          Platform.isIOS
+              ? MainGmap(
+                  mapController.value,
+                  dynamicMarkers.value.union(staticMarkers.value),
+                  polylines.value,
+                  showMyLocation.value,
+                  setMapRotation)
+              : MainAndroidMap(
+                  mapController.value,
+                  polylines.value,
+                  staticMarkers.value,
+                  dynamicMarkers.value,
+                  showMyLocation.value,
+                  setMapRotation),
+          SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation))
+        ],
     ))),
   );
 }

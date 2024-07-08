@@ -120,6 +120,8 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
         onMapCreated: (gController) => setState(() {
           mapId = gController.mapId;
         }),
+        zoomControlsEnabled: false,
+        myLocationButtonEnabled: false,
     );
   }
 }
