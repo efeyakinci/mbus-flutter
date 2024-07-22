@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:mbus/EventPage.dart';
 import 'package:mbus/GlobalConstants.dart';
 import 'package:mbus/map/BusTrackerCard/BusTrackerCard.dart';
 import 'package:mbus/map/MarkerAnimator.dart';
@@ -53,6 +54,74 @@ Widget myLocationButton(void Function() onClick) {
   );
 }
 
+// In the future, we will need to show a countdown timer and event page.
+// Until then, this button lays dormant and invisible until the server activates it
+//   > I'm planning something - you'll see. But even if you don't believe me, pls don't delete this code yet.
+//     Just leave it unactivated on the server for now (which it already is right now).
+@swidget
+Widget eventButton(BuildContext context, bool draw, double percentageForDial, String text) {
+  
+  // if we need to draw it, return the button. Otherwise, return an empty widget
+  if (draw){
+    return Container(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+
+          // button stuff: 
+          child: GestureDetector(
+            onTap:  () {
+              showBarModalBottomSheet(
+                context: context,
+                builder: (context) {
+                  return EventPage();
+                }
+              );
+            },
+            child: Container(
+              height: 56,
+              width: 56,
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(64),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Color(0xAA222234),
+                        offset: Offset(1, 1),
+                        spreadRadius: 1.0,
+                        blurRadius: 4.0)
+                  ],
+                  color: MICHIGAN_BLUE),
+
+              // content stuff:
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CircularProgressIndicator(
+                    value: percentageForDial,
+                    strokeWidth: 6,
+                    color: MICHIGAN_MAIZE,
+                  ),
+                  Center(
+                    child: Text(
+                      text,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white
+                      ),
+                    ),
+                  ) 
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+  } else {
+    // empty widget
+    return SizedBox.shrink();
+  }
+}
+
 Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLocationClick) {
   return SafeArea(child: Container(
     padding: EdgeInsets.all(16),
@@ -61,8 +130,9 @@ Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLoca
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(child: Container(),),
+        EventButton(true, 0.9, "10d"),
         RouteChooser(onRouteButtonClick),
-        MyLocationButton(onLocationClick)
+        MyLocationButton(onLocationClick),
       ],
     ),
   ));
