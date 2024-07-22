@@ -25,45 +25,18 @@ part 'EventPage.g.dart';
 Widget eventPage(BuildContext context) {
 
   Future<Widget> loadRichTextFromLocalJson() async {
-    // Temporary JSON variable to test rich text rendering
-    const jsonString = '''
-    {
-      "sections": [
-        {
-          "title": "EventDescription",
-          "textParts": [
-            {"text": "A ", "bold": false},
-            {"text": "30 minute ", "bold": true},
-            {"text": "long event where we will launch the ", "bold": false},
-            {"text": "biggest mBus update ", "bold": true},
-            {"text": "yet, as well as talk briefly about how ", "bold": false},
-            {"text": "you ", "bold": true},
-            {"text": "can join the mBus development team.", "bold": false}
-          ]
-        },
-        {
-          "title": "EventDetails",
-          "textParts": [
-            {"detail": "Building: ", "text": "Central Campus Classroom Building (CCCB)"},
-            {"detail": "Room: ", "text": "Auditorium (Room 1420)"},
-            {"detail": "Date and Time: ", "text": "Thursday May 26th, 7:00pm - 7:30pm"}
-          ]
-        }
-      ]
-    }
-    ''';
 
-    final Map<String, dynamic> json = jsonDecode(jsonString);
+    final res = await NetworkUtils.getWithErrorHandling(context, "getEventMessageIK");
+    final Map<String, dynamic> json = jsonDecode(res);
     final List<dynamic>? sections = json['sections'] as List<dynamic>?;
 
     if (sections == null || sections.isEmpty) {
-      throw Exception('Failed to parse sections or no sections available');
+      return Text("ERROR: server returned blank data");
     }
 
-    final firstSection = sections.first;
-    final secondSection = sections[1];
-    final textParts = firstSection['textParts'] as List<dynamic>;
-    final details = secondSection['textParts'] as List<dynamic>;
+    final textParts = sections[0]['textParts'] as List<dynamic>;
+    final details = sections[1]['textParts'] as List<dynamic>;
+    final titles = sections[2]['textParts'] as List<dynamic>;
 
     List<TextSpan> spans = textParts.map((part) {
       final text = part['text'] as String;
@@ -78,6 +51,25 @@ Widget eventPage(BuildContext context) {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        Text(
+          titles[0]["title"], 
+          style: TextStyle(
+            fontWeight: FontWeight.w800, 
+            fontSize: 38, 
+            color: MICHIGAN_BLUE
+          ),
+        ),
+        Text(
+          titles[1]["subtitle"], 
+          style: TextStyle(
+            fontWeight: FontWeight.w500, 
+            fontSize: 20, 
+            color: Colors.black
+          ),
+        ),
+        SizedBox(height: 10,),
+        Image.asset("assets/auditorium.png"),
+        SizedBox(height: 10,),       
         RichText(
           text: TextSpan(
             children: spans,
@@ -138,27 +130,23 @@ Widget eventPage(BuildContext context) {
             ],
           ),
         ),
+        SizedBox(height: 25,),
+        GestureDetector(
+          onTap: () {print("yurr");},
+          child: (
+              AnimatedContainer(
+                duration: Duration(milliseconds: 250),
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                    color: MICHIGAN_BLUE,
+                    borderRadius: BorderRadius.circular(16)
+                ),
+                child: Center(child: Text("Add to Calendar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),)
+          ),
+        )
       ],
     );
   }
-  
-  /*
-  Future<List<IncomingBus>> getBusInfo() async {
-    final res = await NetworkUtils.getWithErrorHandling(context, "getStopPredictions/${busStopId}");
-    final resJson = jsonDecode(res)['bustime-response'];
-    final GlobalConstants globalConstants = GlobalConstants();
-    if (resJson == null) {
-      return [];
-    }
-    List<IncomingBus> _busses = [];
-    if (resJson['prd'] != null) {
-      resJson['prd'].forEach((e) {
-        _busses.add(new IncomingBus(e['vid'], e['des'], e['prdctdn'], globalConstants.ROUTE_ID_TO_ROUTE_NAME[e['rt']] ?? "Unknown Route"));
-      });
-    }
-    return _busses;
-  }
-  */
 
   return ScrollConfiguration(
     behavior: CardScrollBehavior(),
@@ -169,58 +157,20 @@ Widget eventPage(BuildContext context) {
           children: [
             Container(
               padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "YOU'RE INVITED", 
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800, 
-                      fontSize: 38, 
-                      color: MICHIGAN_BLUE
-                    ),
-                  ),
-                  Text(
-                    "to the mBus 2.0 launch event", 
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500, 
-                      fontSize: 20, 
-                      color: Colors.black
-                    ),
-                  ),
-                  SizedBox(height: 10,),
-                  Image.asset("assets/auditorium.png"),
-                  SizedBox(height: 10,),
-                  FutureBuilder<Widget>(
-                    future: loadRichTextFromLocalJson(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return CircularProgressIndicator();
-                      } else if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      } else {
-                        return snapshot.data ?? Text('No text loaded');
-                      }
-                    },
-                  ),
-                  SizedBox(height: 25,),
-                  GestureDetector(
-                    onTap: () {print("yurr");},
-                    child: (
-                        AnimatedContainer(
-                          duration: Duration(milliseconds: 250),
-                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          decoration: BoxDecoration(
-                              color: MICHIGAN_BLUE,
-                              borderRadius: BorderRadius.circular(16)
-                          ),
-                          child: Center(child: Text("Add to Calendar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),)
-                    ),
-                  )
-                ],
+              child: FutureBuilder<Widget>(
+                future: loadRichTextFromLocalJson(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return CircularProgressIndicator();
+                  } else if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}');
+                  } else {
+                    return snapshot.data ?? Text('No text loaded');
+                  }
+                },
               ),
-            )],
+            )
+          ],
         )
     ),
   );
