@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import './DataTypes.dart';
 import 'BusStopCard/BusStopCard.dart';
+import 'package:http/http.dart' as http;
 
 part 'MainMap.g.dart';
 
@@ -57,7 +58,7 @@ Widget myLocationButton(void Function() onClick) {
 // In the future, we will need to show a countdown timer and event page.
 // Until then, this button lays dormant and invisible until the server activates it
 //   > I'm planning something - you'll see. But even if you don't believe me, pls don't delete this code yet.
-//     Just leave it unactivated on the server for now (which it already is right now).
+//     Just leave it unactivated on the server-side for now (which it already is right now).
 @swidget
 Widget eventButton(BuildContext context, bool draw, double percentageForDial, String text) {
   
@@ -122,7 +123,8 @@ Widget eventButton(BuildContext context, bool draw, double percentageForDial, St
   }
 }
 
-Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLocationClick) {
+Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLocationClick,
+                  bool showEventButton, double percentageForEventButton, String textForEventButton) {
   return SafeArea(child: Container(
     padding: EdgeInsets.all(16),
     child: Column(
@@ -130,7 +132,7 @@ Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLoca
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(child: Container(),),
-        EventButton(true, 0.9, "10d"),
+        EventButton(showEventButton, percentageForEventButton, textForEventButton),
         RouteChooser(onRouteButtonClick),
         MyLocationButton(onLocationClick),
       ],
@@ -265,6 +267,12 @@ class MapData {
 
 @hwidget
 Widget mainMap(Set<RouteData> selectedRoutesIn) {
+  
+  // variables for event button
+  final showButton = useState(false);
+  final buttonPercentage = useState(0.0);
+  final buttonText = useState("0d");
+
   BuildContext context = useContext();
   // Google Map Controller
   final mapController = useRef(Completer<GoogleMapController>());
@@ -399,6 +407,57 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
     selectedRouteStops.value = getSelectedData(mapData.value.routeStops);
   }
 
+  // A function that checks whether or not the event button should be displayed
+  // If it should, then it sets all the button's information and toggles it on
+  //   > if any errors happen, it sets the button status to "false". This is 
+  //     to ensure that it will work in its current state without needing to
+  //     update the server. This is also why I don't use the NetworkUtils 
+  //     function
+  Future<void> _updateEventButtonStatus() async {
+
+    // server call
+    Future<bool> getEventButtonStatus() async {
+
+      try {
+        final res = await http.get(Uri.parse("${BACKEND_URL}/getEventButtonInformation"));
+        if (!res.persistentConnection) {
+          return false;
+        } else if (res.statusCode != 200) {
+          return false;
+        } else {
+          final Map<String, dynamic> json = jsonDecode(res.body);
+          final List<dynamic>? sections = json['sections'] as List<dynamic>?;
+
+          if (sections == null || sections.isEmpty) {
+            return false;
+          }
+
+          try {
+            final trueOrFalse = sections[0]['bool']; 
+            if (trueOrFalse){
+              buttonText.value = sections[1]['timeLeft']; 
+              buttonPercentage.value = sections[1]['progressBarPercentage']; 
+            }
+            return trueOrFalse;
+          } catch (e){
+            buttonText.value = "err"; 
+            buttonPercentage.value = 0.0; 
+            return false;
+          }
+        }
+      } catch (e) {
+        return false;
+      }
+    }
+
+    bool newStatus = await getEventButtonStatus();
+
+    // toggle button on if needed
+    if (newStatus != showButton) {
+      showButton.value = newStatus;
+    }
+  }
+
   // Filters all markers to only contain the selected routes
   void rebuildSelections() {
     final prevBuses = Set.from(selectedBuses.value);
@@ -520,9 +579,14 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
       getBusRoutes();
     });
 
+    final eventButtonCheckTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+      _updateEventButtonStatus();
+    });
+
     return () {
       busTimer.cancel();
       routeTimer.cancel();
+      eventButtonCheckTimer.cancel();
     };
   };
 
@@ -598,7 +662,7 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
                   dynamicMarkers.value,
                   showMyLocation.value,
                   setMapRotation),
-          SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation))
+          SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation, showButton.value, buttonPercentage.value, buttonText.value))
         ],
     ))),
   );

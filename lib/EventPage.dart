@@ -70,10 +70,6 @@ Widget eventPage(BuildContext context) {
         ),
         SizedBox(height: 10,),
         
-        /*
-        Image.asset("assets/auditorium.png"),
-        */
-
         FutureBuilder<Uint8List?>(
           future: NetworkUtils.getImageWithErrorHandling(context,"getEventImageIK"),
           builder: (context, snapshot) {
