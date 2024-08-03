@@ -59,6 +59,7 @@ dependencies:
   expandable_page_view: ^1.0.17
   geolocator: ^9.0.2
   logging: ^1.2.0
+  url_launcher: ^6.0.20
 
 dev_dependencies:
   build_runner: ^2.4.9

@@ -1,4 +1,4 @@
-// A page that shows event information
+// The page that opens when the event button is tapped
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import 'package:map_launcher/map_launcher.dart';
 import 'package:mbus/map/BusStopCard/BusStopCardBody.dart';
 import 'package:mbus/map/BusStopCard/BusStopCardHeader.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import '/../GlobalConstants.dart';
 import '/../constants.dart';
@@ -19,6 +20,7 @@ import '/map/CardScrollBehavior.dart';
 import '/map/DataTypes.dart';
 import '/map/FavoriteButton.dart';
 import 'dart:typed_data';
+import 'package:url_launcher/url_launcher.dart';
 
 part 'EventPage.g.dart';
 
@@ -27,7 +29,7 @@ Widget eventPage(BuildContext context) {
 
   Future<Widget> loadPageFromServer() async {
 
-    final res = await NetworkUtils.getWithErrorHandling(context, "getEventMessageIK");
+    final res = await NetworkUtils.getWithErrorHandling(context, "getEventMessage");
     final Map<String, dynamic> json = jsonDecode(res);
     final List<dynamic>? sections = json['sections'] as List<dynamic>?;
 
@@ -39,6 +41,8 @@ Widget eventPage(BuildContext context) {
     final details = sections[1]['textParts'] as List<dynamic>;
     final titles = sections[2]['textParts'] as List<dynamic>;
 
+    // A TextSpan builder which turns the JSON data into a paragraph 
+    // of text with some parts being bolded while others are normal. 
     List<TextSpan> spans = textParts.map((part) {
       final text = part['text'] as String;
       final isBold = part['bold'] as bool;
@@ -48,10 +52,13 @@ Widget eventPage(BuildContext context) {
       );
     }).toList();
 
+    // column of widgets for the page - most loaded from server response
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+
+        // Page Title
         Text(
           titles[0]["title"], 
           style: TextStyle(
@@ -60,6 +67,8 @@ Widget eventPage(BuildContext context) {
             color: MICHIGAN_BLUE
           ),
         ),
+
+        // Page Subtitle
         Text(
           titles[1]["subtitle"], 
           style: TextStyle(
@@ -68,10 +77,12 @@ Widget eventPage(BuildContext context) {
             color: Colors.black
           ),
         ),
+
         SizedBox(height: 10,),
         
+        // Image builder (tries to load image, on fail uses a fallback one)
         FutureBuilder<Uint8List?>(
-          future: NetworkUtils.getImageWithErrorHandling(context,"getEventImageIK"),
+          future: NetworkUtils.getImageWithErrorHandling(context,"getEventImage"),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
@@ -87,7 +98,9 @@ Widget eventPage(BuildContext context) {
           },
         ),
 
-        SizedBox(height: 10,),       
+        SizedBox(height: 10,),    
+
+        // Paragraph. Uses TextSpan builder from earlier   
         RichText(
           text: TextSpan(
             children: spans,
@@ -98,7 +111,9 @@ Widget eventPage(BuildContext context) {
             ),
           ),
         ),
+
         SizedBox(height: 20,),
+
         Text(
           "Details:", 
           style: TextStyle(
@@ -107,6 +122,8 @@ Widget eventPage(BuildContext context) {
             color: MICHIGAN_BLUE
           ),
         ),
+
+        // Sections of details. Descprition followed by text.
         RichText(
           text: TextSpan(
             text: details.first['detail'],
@@ -148,18 +165,41 @@ Widget eventPage(BuildContext context) {
             ],
           ),
         ),
+
         SizedBox(height: 25,),
+
+        // "Add to calendar" button (opens a link, most likely to a calendar invite)
         GestureDetector(
-          onTap: () {print("yurr");},
+          onTap: () {
+            void _launchURL() async {
+              final res = await NetworkUtils.getWithErrorHandling(context, "getEventButtonInformation");
+              final Map<String, dynamic> json = jsonDecode(res);
+              final List<dynamic>? sections = json['sections'] as List<dynamic>?;
+
+              if (sections == null || sections.isEmpty) {
+                return;
+              }
+
+              final url = sections[1]['link'];
+              
+              try {
+                await launchUrlString(url, mode: LaunchMode.externalApplication);
+              } catch(e) {
+                return;
+              }
+            }
+
+            _launchURL();
+          },
           child: (
-              AnimatedContainer(
-                duration: Duration(milliseconds: 250),
-                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                    color: MICHIGAN_BLUE,
-                    borderRadius: BorderRadius.circular(16)
-                ),
-                child: Center(child: Text("Add to Calendar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),)
+            AnimatedContainer(
+              duration: Duration(milliseconds: 250),
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                  color: MICHIGAN_BLUE,
+                  borderRadius: BorderRadius.circular(16)
+              ),
+              child: Center(child: Text("Add to Calendar", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),)
           ),
         )
       ],
@@ -179,7 +219,13 @@ Widget eventPage(BuildContext context) {
                 future: loadPageFromServer(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return CircularProgressIndicator();
+                    return SizedBox(
+                      child: Center(
+                        child: CircularProgressIndicator()
+                      ),
+                      height: 50.0,
+                      width: 50.0
+                    );
                   } else if (snapshot.hasError) {
                     return Text('Error: ${snapshot.error}');
                   } else {

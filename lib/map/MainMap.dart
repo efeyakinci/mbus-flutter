@@ -570,6 +570,7 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
   final setUpdateIntervals = () {
     updateBuses();
     getBusRoutes();
+    _updateEventButtonStatus();
 
     final busTimer = Timer.periodic(Duration(seconds: 5), (timer) {
       updateBuses();
