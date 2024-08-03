@@ -1,4 +1,4 @@
-// Card for bus stop information e.g. arrivals, route name.
+// A page that shows event information
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -18,13 +18,14 @@ import '/map/Animations.dart';
 import '/map/CardScrollBehavior.dart';
 import '/map/DataTypes.dart';
 import '/map/FavoriteButton.dart';
+import 'dart:typed_data';
 
 part 'EventPage.g.dart';
 
 @swidget
 Widget eventPage(BuildContext context) {
 
-  Future<Widget> loadRichTextFromLocalJson() async {
+  Future<Widget> loadPageFromServer() async {
 
     final res = await NetworkUtils.getWithErrorHandling(context, "getEventMessageIK");
     final Map<String, dynamic> json = jsonDecode(res);
@@ -68,7 +69,28 @@ Widget eventPage(BuildContext context) {
           ),
         ),
         SizedBox(height: 10,),
+        
+        /*
         Image.asset("assets/auditorium.png"),
+        */
+
+        FutureBuilder<Uint8List?>(
+          future: NetworkUtils.getImageWithErrorHandling(context,"getEventImageIK"),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError || snapshot.data == null) {
+              return Image.asset("assets/mbusFallbackImage.png");
+            } else {
+              return Image.memory(
+                snapshot.data!,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              );
+            }
+          },
+        ),
+
         SizedBox(height: 10,),       
         RichText(
           text: TextSpan(
@@ -158,7 +180,7 @@ Widget eventPage(BuildContext context) {
             Container(
               padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
               child: FutureBuilder<Widget>(
-                future: loadRichTextFromLocalJson(),
+                future: loadPageFromServer(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return CircularProgressIndicator();
