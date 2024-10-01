@@ -189,11 +189,19 @@ class SettingsSection extends StatelessWidget {
 
 class _SettingsState extends State<Settings> {
   bool colorblindModeIsEnabled = false;
+  bool leftHandedModeEnabled = false;
 
   void _checkIfColorblindModeIsEnabled() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       colorblindModeIsEnabled = prefs.getBool("isColorBlindEnabled") ?? false;
+    });
+  }
+
+  void _checkIfLeftHandModeIsEnabled() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      leftHandedModeEnabled = prefs.getBool("isLeftHandEnabled") ?? false;
     });
   }
 
@@ -217,10 +225,31 @@ class _SettingsState extends State<Settings> {
     showDialog(context: context, builder: getMessageDialog(data), barrierDismissible: false);
   }
 
+  void setLeftHandedMode(bool value) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("isLeftHandEnabled", value);
+
+    setState(() {
+      leftHandedModeEnabled = value;
+    });
+
+    DialogAction action = DialogAction("OK", () {
+      Phoenix.rebirth(context);
+    });
+
+    DialogData data = DialogData(
+        "Left-Handed Mode",
+        "Left-Handed Mode has been ${value ? "enabled" : "disabled"}.\n\nThe app will now reload to apply the changes.",
+        [action]);
+
+    showDialog(context: context, builder: getMessageDialog(data), barrierDismissible: false);
+  }
+
   @override
   void initState() {
     super.initState();
     _checkIfColorblindModeIsEnabled();
+    _checkIfLeftHandModeIsEnabled();
   }
 
   Widget build(BuildContext context) {
@@ -261,6 +290,8 @@ class _SettingsState extends State<Settings> {
               //SwitchOption("Dark Mode", false, (p0) => null),
               SwitchOption("Colorblind Friendly", colorblindModeIsEnabled,
                   setColorblindMode),
+              SwitchOption("Left-Handed Mode", leftHandedModeEnabled,
+                  setLeftHandedMode),
             ]
           ),
           SettingsSection("Questions or Feedback?"),

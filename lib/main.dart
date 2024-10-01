@@ -88,6 +88,7 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBin
   bool _currentlyCheckingAssets = false;
   bool _currentlyMessageShowing = false;
   bool _isLoaded = false;
+  bool _isLeftHandedMode = false;
   Set<RouteData> selectedRoutes = Set<RouteData>();
   GlobalConstants globalConstants = GlobalConstants();
   final log = new Logger("main.dart");
@@ -348,6 +349,11 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBin
     }
   }
 
+  Future<void> _checkLeftHandedMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    _isLeftHandedMode = prefs.getBool("isLeftHandEnabled") ?? false;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -362,6 +368,7 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBin
       _checkNewAssets(),
       _checkIfOnboarded(),
       _checkUpdateNotes(),
+      _checkLeftHandedMode(),
     ]);
     // depends on _checkNewAssets
     await _loadBusImages();
@@ -413,7 +420,7 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBin
         ),
       );
     } else if (_hasBeenOnboarded) {
-      return NavigationContainer(selectedRoutes);
+      return NavigationContainer(selectedRoutes, _isLeftHandedMode);
     } else {
       // run onboarding sequence, and _onBoardingComplete after
       return OnBoardingScreen(_onBoardingComplete);
@@ -423,8 +430,9 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher> with WidgetsBin
 
 class NavigationContainer extends StatefulWidget {
   Set<RouteData> _selectedRoutes;
+  bool isLeftHandEnabled;
 
-  NavigationContainer(this._selectedRoutes);
+  NavigationContainer(this._selectedRoutes, this.isLeftHandEnabled);
 
   @override
   _NavigationContainerState createState() => _NavigationContainerState();
@@ -456,7 +464,7 @@ class _NavigationContainerState extends State<NavigationContainer> {
     return Scaffold(
       body: IndexedStack(
         children: [
-          MainMap(widget._selectedRoutes.toSet()),
+          MainMap(widget._selectedRoutes.toSet(), widget.isLeftHandEnabled),
           Favorites(favoritesNotifier),
           Settings((Set<RouteData> newRoutes) {
             setState(() {

@@ -53,12 +53,14 @@ Widget myLocationButton(void Function() onClick) {
   );
 }
 
-Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLocationClick) {
+Widget mapButtons(Function(Set<RouteData>) onRouteButtonClick, Function() onLocationClick, bool isLeftHandEnabled) {
+
   return SafeArea(child: Container(
     padding: EdgeInsets.all(16),
     child: Column(
       mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      // set the side based on whether or not left handed mode is enabled
+      crossAxisAlignment: isLeftHandEnabled? CrossAxisAlignment.start : CrossAxisAlignment.end,
       children: [
         Expanded(child: Container(),),
         RouteChooser(onRouteButtonClick),
@@ -194,7 +196,7 @@ class MapData {
 }
 
 @hwidget
-Widget mainMap(Set<RouteData> selectedRoutesIn) {
+Widget mainMap(Set<RouteData> selectedRoutesIn, bool isLeftHandEnabled) {
   BuildContext context = useContext();
   // Google Map Controller
   final mapController = useRef(Completer<GoogleMapController>());
@@ -528,7 +530,7 @@ Widget mainMap(Set<RouteData> selectedRoutesIn) {
                   dynamicMarkers.value,
                   showMyLocation.value,
                   setMapRotation),
-          SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation))
+          SafeArea(child: mapButtons(routeChooserOnClick, centerMapOnLocation, isLeftHandEnabled))
         ],
     ))),
   );
