@@ -27,37 +27,35 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.2
-  location: ^5.0.3
+  location: ^8.0.0
   http: ^1.2.0
   shared_preferences: ^2.0.6
   equatable: ^2.0.3
   modal_bottom_sheet: ^3.0.0-pre
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.3
   sqflite: ^2.0.0+3
   flutter_native_splash: ^2.3.10
-  intl: ^0.17.0
+  intl: ^0.20.2
   pull_to_refresh: ^2.0.0
   introduction_screen: ^3.1.12
   flutter_svg: ^2.0.9
   flutter_vibrate: ^1.1.0
   bitmap: ^0.2.0
   connectivity: ^3.0.6
-#  flutter_animarker_modified:
-#    path: ../animarker_modified
   pausable_timer: ^3.1.0+3
   provider: ^6.0.0
   flutter_cache_manager: ^3.1.2
   cached_network_image: ^3.1.0
   map_launcher: ^3.1.0
-  carousel_slider: ^4.2.1
-  flutter_markdown: ^0.6.13
+  carousel_slider: ^5.0.0
+  flutter_markdown: ^0.7.6+2
   google_maps_cluster_manager: ^3.0.0+1
   google_maps_flutter: ^2.6.1
-  flutter_hooks: ^0.20.5
+  flutter_hooks: ^0.21.2
   functional_widget_annotation: ^0.10.0
   flutter_phoenix: ^1.1.1
   expandable_page_view: ^1.0.17
-  geolocator: ^9.0.2
+  geolocator: ^13.0.3
   logging: ^1.2.0
 
 dev_dependencies:
