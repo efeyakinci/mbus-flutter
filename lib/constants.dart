@@ -1,28 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const Color MICHIGAN_BLUE = Color(0xFF00274C);
 const Color MICHIGAN_MAIZE = Color(0xFFFFCB05);
 const String BACKEND_URL = String.fromEnvironment("BACKEND_URL", defaultValue: "https://www.efeakinci.host/mbus/api/v3");
 
+const LatLng ANN_ARBOR = LatLng(42.278235, -83.738118);
 
-const Map<String, Color> ROUTE_COLORS = {
-  "CC": Colors.red,
-  "GNW": Colors.blue,
-  "MX": Colors.green,
-  "NWL": Colors.orange,
-  "OXM": Colors.purple,
-  "SD": Color(0xFFd633b5),
-  "WS": Color(0xFF39BD95),
-  "WX": Colors.cyan
-};
-const Map<String, String> ROUTE_ID_TO_ROUTE_NAME = {
-  "CC": "Campus Connector",
-  "GNW": "Green Road - Northwood V Loop",
-  "MX": "Med Express",
-  "NWL": "Northwood Loop",
-  "OXM": "Oxford - Markley Loop",
-  "SD": "Stadium - Diag Loop",
-  "WS": "Wall Street - NIB",
-  "WX": "Wall Street Express"
-};
+const BUILD_VERSION = 11;

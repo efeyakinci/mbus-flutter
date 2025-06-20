@@ -7,6 +7,8 @@ const TERMS_AND_CONDITIONS = "M-Bus or UM Transit APIs are not responsible or li
 const PRIVACY_POLICY = "This section details the user data M-Bus collects and how the data are used and treated.\n\nM-Bus as an entity does not store or collect any information about you. However, M-Bus utilizes the University of Michigan Magic Bus API, which does collect some information about you. As the Magic Bus Terms of Service state, \"We automatically collect and store technical information about your visit to our site including: (1) the name of the domain and host from which you access the Internet; (2) the type of browser software and operating system used to access our site; (3) the date and time you access our site; and (4) the pages you visit on our site. The technical information collected will not personally identify you. We also store technical information that we collect through cookies and log files to create a profile of our customers. The profile information is used to improve the content of the site, to perform a statistical analysis of use of the site and to enhance use of the site. Technical information stored in a profile will not be linked to any personal information provided to us through your other use of our websites.\"\n\nPlease refer to the U-M Magic Bus Terms of Service at https://mbus.ltp.umich.edu/terms-use for the latest versions of the U-M Magic Bus documents.\n\nAdditionally, M-Bus provides your location to Google Maps SDK to display your location on the map. Information about how Google Maps handles your data can be located at http://www.google.com/policies/privacy";
 
 class TermsScreen extends StatelessWidget {
+  const TermsScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return (

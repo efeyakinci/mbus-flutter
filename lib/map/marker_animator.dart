@@ -4,7 +4,7 @@ import 'dart:collection';
 import 'package:flutter/cupertino.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
-import 'package:mbus/GlobalConstants.dart';
+import 'package:mbus/constants.dart';
 
 
 class MarkerAnimator extends StatefulWidget {
@@ -15,7 +15,7 @@ class MarkerAnimator extends StatefulWidget {
   bool myLocationButtonEnabled;
   CameraTargetBounds cameraTargetBounds;
   MinMaxZoomPreference minMaxZoomPreference;
-  MarkerAnimator({Key? key, required this.dynamicMarkers, required this.staticMarkers, required this.onCameraMove, this.polylines: const {}, this.myLocationButtonEnabled: false, required this.cameraTargetBounds, required this.minMaxZoomPreference}) : super(key: key);
+  MarkerAnimator({Key? key, required this.dynamicMarkers, required this.staticMarkers, required this.onCameraMove, this.polylines = const {}, this.myLocationButtonEnabled = false, required this.cameraTargetBounds, required this.minMaxZoomPreference}) : super(key: key);
 
   @override
   _MarkerAnimatorState createState() => _MarkerAnimatorState();
@@ -29,7 +29,7 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
   int? mapId; // unsure
   HashMap<MarkerId, List<double>> markerDeltas = HashMap();
   static const CameraPosition _annArbor = const CameraPosition(
-    target: GlobalConstants.ANN_ARBOR,
+    target: ANN_ARBOR,
     zoom: 14.4746,
   );
 

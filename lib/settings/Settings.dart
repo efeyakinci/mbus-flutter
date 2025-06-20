@@ -6,21 +6,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:flutter_vibrate/flutter_vibrate.dart';
-import 'package:mbus/about/AboutScreen.dart';
+import 'package:vibration/vibration.dart';
+import 'package:mbus/about/about_screen.dart';
 import 'package:mbus/dialogs/message_dialog.dart';
 import 'package:mbus/feedback/Feedback.dart';
-import 'package:mbus/GlobalConstants.dart';
-import 'package:mbus/map/CardScrollBehavior.dart';
-import 'package:mbus/map/MainMap.dart';
+import 'package:mbus/map/card_scroll_behavior.dart';
 import 'package:mbus/constants.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';
-import 'package:http/http.dart' as http;
 import 'package:mbus/mbus_utils.dart';
+import 'package:mbus/state/app_state.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equatable/equatable.dart';
+import 'package:mbus/preferences_keys.dart';
 
 const SETTINGS_TITLE_STYLE =
     TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: MICHIGAN_BLUE);
@@ -75,6 +73,7 @@ WidgetBuilder getFactoryResetDialog(BuildContext context) {
 }
 
 WidgetBuilder getClearAssetsDialog(BuildContext context) {
+  final AppState appState = AppState();
   final actions = [
     DialogAction(
       "Cancel",
@@ -84,8 +83,8 @@ WidgetBuilder getClearAssetsDialog(BuildContext context) {
       "Clear",
       () async {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("routeInformation", "{}");
-        final routeNames = GlobalConstants().ROUTE_TO_IMAGE;
+        await prefs.setString(PrefKeys.routeInformation, "{}");
+        final routeNames = appState.routeToImage;
 
         for (final routeName in routeNames.keys) {
           await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeName}?colorblind=Y");
@@ -124,7 +123,7 @@ class SwitchOptions extends StatelessWidget {
   }
 }
 
-class SwitchOption extends HookWidget {
+class SwitchOption extends StatelessWidget {
   final String title;
   final bool value;
   final Function(bool) onChanged;
@@ -149,10 +148,7 @@ class SwitchOption extends HookWidget {
           Switch(
             value: value,
             activeColor: MICHIGAN_MAIZE,
-            onChanged: (value) {
-              value = value;
-              onChanged(value);
-            },
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -193,20 +189,20 @@ class _SettingsState extends State<Settings> {
   void _checkIfColorblindModeIsEnabled() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      colorblindModeIsEnabled = prefs.getBool("isColorBlindEnabled") ?? false;
+      colorblindModeIsEnabled = prefs.getBool(PrefKeys.colorBlindEnabled) ?? false;
     });
   }
 
   void setColorblindMode(bool value) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool("isColorBlindEnabled", value);
+    await prefs.setBool(PrefKeys.colorBlindEnabled, value);
     setState(() {
       colorblindModeIsEnabled = value;
     });
     DialogAction action = DialogAction("OK", () {
       DefaultCacheManager().emptyCache().then((_) async {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("routeInformation", "{}");
+        await prefs.setString(PrefKeys.routeInformation, "{}");
         Phoenix.rebirth(context);
         });
     });
@@ -238,7 +234,7 @@ class _SettingsState extends State<Settings> {
             height: 8,
           ),
           Text(
-            "Build: ${GlobalConstants.BUILD_VERSION}",
+            "Build: ${BUILD_VERSION}",
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: Colors.grey,
@@ -330,8 +326,8 @@ class SelectableBusRoute extends StatelessWidget {
       onTap: onClick,
       onLongPress: () async {
         onLongClick();
-        if (await Vibrate.canVibrate){
-          Vibrate.feedback(FeedbackType.medium);
+        if (await Vibration.hasVibrator() ?? false) {
+          Vibration.vibrate(duration: 50);
         }
       },
       child: (Container(
@@ -406,7 +402,7 @@ class _SettingsCardState extends State<SettingsCard> {
         selectedRoutes.add(route);
       }
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      prefs.setString("selectedRoutes", jsonEncode(selectedRoutes.toList()));
+      prefs.setString(PrefKeys.selectedRoutes, jsonEncode(selectedRoutes.toList()));
     });
   }
 
@@ -415,7 +411,7 @@ class _SettingsCardState extends State<SettingsCard> {
       selectedRoutes.clear();
       selectedRoutes.add(route);
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      prefs.setString("selectedRoutes", jsonEncode(selectedRoutes.toList()));
+      prefs.setString(PrefKeys.selectedRoutes, jsonEncode(selectedRoutes.toList()));
     });
   }
 
@@ -491,7 +487,7 @@ class _SettingsCardState extends State<SettingsCard> {
                   }, () {
                     _onlySelectRoute(e);
                   },
-                      GlobalConstants().ROUTE_COLORS[e.routeId] ??
+                      AppState().routeColors[e.routeId] ??
                           Color(0x00000000))),
               SizedBox(height: 8),
               Row(

@@ -4,7 +4,7 @@ class CardRectangleLoadingAnimation extends StatefulWidget {
   final int numRows;
   double height = 64.0;
 
-  CardRectangleLoadingAnimation(this.numRows, {height: 64.0}) {
+  CardRectangleLoadingAnimation(this.numRows, {height = 64.0}) {
     this.height = height;
   }
 

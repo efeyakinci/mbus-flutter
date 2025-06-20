@@ -1,25 +1,20 @@
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_vibrate/flutter_vibrate.dart';
-import 'package:mbus/interfaces/BootlegNotifier.dart';
-import 'package:mbus/GlobalConstants.dart';
+import 'package:vibration/vibration.dart';
+import 'package:mbus/state/app_state.dart';
 import 'package:mbus/constants.dart';
-import 'package:mbus/map/Animations.dart';
-import 'package:mbus/map/DataTypes.dart';
-import 'package:mbus/map/FavoriteButton.dart';
+import 'package:mbus/map/animations.dart';
+import 'package:mbus/map/data_types.dart';
+import 'package:mbus/map/favorite_button.dart';
 import 'package:mbus/mbus_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
-
-import '../map/MainMap.dart';
 
 class SavedFavorite extends Equatable{
   final String stopId;
@@ -59,7 +54,7 @@ class FavoritesHeader extends StatelessWidget {
 }
 
 class Favorites extends StatefulWidget {
-  BootlegNotifier onSwitchedTo;
+  final ChangeNotifier onSwitchedTo;
   Favorites(this.onSwitchedTo);
 
   _FavoritesState createState() => _FavoritesState();
@@ -71,19 +66,20 @@ class _FavoritesState extends State<Favorites> {
   Set<SavedFavorite> prevFavorites = {};
   List<FavoriteCardInfo> cardInformation = [];
   bool makingRequest = false;
-  GlobalConstants globalConstants = GlobalConstants();
+  AppState appState = AppState();
 
 
-  Future<void> _getFavorites({overrideRefreshChecks: false}) async {
+  Future<void> _getFavorites({overrideRefreshChecks = false}) async {
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     Set<SavedFavorite> favorites = prefs.getStringList("favorites")?.map((e) => SavedFavorite.fromJson(jsonDecode(e))).toSet() ?? {};
     List<FavoriteCardInfo> receivedInfo = [];
     bool setsEqual = setEquals(prevFavorites, favorites);
     prevFavorites = favorites;
-    if (setsEqual && DateTime.now().difference(lastRefresh) < Duration(minutes: 1) && cardInformation.length > 0 && !overrideRefreshChecks) {
+    if (setsEqual && DateTime.now().difference(lastRefresh) < const Duration(minutes: 1) && cardInformation.isNotEmpty && !overrideRefreshChecks) {
       return;
     }
+    if(!mounted) return;
     setState(() {
       makingRequest = true;
     });
@@ -93,12 +89,13 @@ class _FavoritesState extends State<Favorites> {
       final List<IncomingBus> busses = [];
       if (arrivalsResJson['prd'] != null) {
         arrivalsResJson['prd'].forEach((e) {
-          busses.add(new IncomingBus(e['vid'], e['des'], e['prdctdn'], GlobalConstants().ROUTE_ID_TO_ROUTE_NAME[e['rt']] ?? "Unknown Route"));
+          busses.add(new IncomingBus(e['vid'], e['des'], e['prdctdn'], appState.routeIdToRouteName[e['rt']] ?? "Unknown Route"));
         });
       }
       receivedInfo.add(FavoriteCardInfo(element.stopId, element.stopName, busses));
     });
     lastRefresh = DateTime.now();
+    if(!mounted) return;
     setState(() {
       cardInformation = receivedInfo;
       makingRequest = false;
@@ -113,11 +110,17 @@ class _FavoritesState extends State<Favorites> {
 
   @override
   void initState() {
+    super.initState();
     lastRefresh = DateTime.now();
     _getFavorites();
-    widget.onSwitchedTo.onNotify = () {
-        _getFavorites();
-    };
+    widget.onSwitchedTo.addListener(_getFavorites);
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    widget.onSwitchedTo.removeListener(_getFavorites);
+    super.dispose();
   }
 
   @override
@@ -126,7 +129,7 @@ class _FavoritesState extends State<Favorites> {
     SafeArea(
       child: makingRequest ?
           Container(
-            padding: EdgeInsets.symmetric(vertical: 32, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 8),
             child: Center(
               child: ListView(
                 children: [
@@ -139,7 +142,7 @@ class _FavoritesState extends State<Favorites> {
           :
           Container(
           child: (
-            cardInformation.length > 0 ?
+            cardInformation.isNotEmpty ?
                 SmartRefresher(
                   enablePullDown: true,
                   controller: _refreshController,
@@ -147,49 +150,47 @@ class _FavoritesState extends State<Favorites> {
                   header: CustomHeader(
                     builder: (context, status) {
                       if (status == RefreshStatus.canRefresh) {
-                        Vibrate.canVibrate.then((value) {
-                          if (value) {
-                            Vibrate.feedback(FeedbackType.impact);
+                        Vibration.hasVibrator().then((hasVibrator) {
+                          if (hasVibrator) {
+                            Vibration.vibrate(duration: 100);
                           }
                         });
                       }
                       return Container(
                         child: Center(
                             child: Text(status == RefreshStatus.canRefresh ? "Release to Update" : "Pull Down to Update",
-                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 18),)
+                            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 18),)
                         ),
                       );
                     },
                   ),
                   child: ListView.builder(
                     addAutomaticKeepAlives: true,
-                    padding: EdgeInsets.symmetric(vertical: 32, horizontal: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 8),
                       itemCount: 3,
                       itemBuilder: (context, index) {
                       if (index == 0) {
                         return FavoritesHeader(lastRefresh);
                       }
                       else if (index == 2) {
-                        return Center(child: Text("Things have changed!\nSwipe horizontally to see your new favorites!", style: TextStyle(color: Colors.grey), textAlign: TextAlign.center,));
+                        return const Center(child: Text("Things have changed!\nSwipe horizontally to see your new favorites!", style: TextStyle(color: Colors.grey), textAlign: TextAlign.center,));
                       }
                       else {
-                          return Container(
-                            child: CarouselSlider(
-                              options: CarouselOptions(
-                                // make height max height of each child
-                                height: 800,
-                                viewportFraction: 0.9,
-                                enlargeFactor: 0,
-                                enableInfiniteScroll: false,
-                                enlargeCenterPage: true,
-                                autoPlay: false,
-                                autoPlayInterval: Duration(seconds: 5),
-                                autoPlayAnimationDuration: Duration(milliseconds: 800),
-                                autoPlayCurve: Curves.fastOutSlowIn,
-                                scrollDirection: Axis.horizontal,
-                              ),
-                              items: cardInformation.map((card) => FavoriteStopCard(card)).toList(),
-                            )
+                          return CarouselSlider(
+                            options: CarouselOptions(
+                              // make height max height of each child
+                              height: 800,
+                              viewportFraction: 0.9,
+                              enlargeFactor: 0,
+                              enableInfiniteScroll: false,
+                              enlargeCenterPage: true,
+                              autoPlay: false,
+                              autoPlayInterval: Duration(seconds: 5),
+                              autoPlayAnimationDuration: Duration(milliseconds: 800),
+                              autoPlayCurve: Curves.fastOutSlowIn,
+                              scrollDirection: Axis.horizontal,
+                            ),
+                            items: cardInformation.map((card) => FavoriteStopCard(card)).toList(),
                           );
                       }
                       }),
@@ -276,7 +277,7 @@ class _FavoriteStopCardState extends State<FavoriteStopCard> with AutomaticKeepA
                 children: widget.cardInfo.incomingBusses.length > 0 ? widget.cardInfo.incomingBusses.map((e) => _FavoriteStopArrivalsDisplay(e)).toList() : [Text("No service to this stop at this time.", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),)],
               ),
               SizedBox(height: 16,),
-              BusStopCardFavoriteButton(widget.cardInfo.stopId, widget.cardInfo.stopName, small: true,)
+              BusStopCardFavoriteButton(busStopId: widget.cardInfo.stopId, busStopName: widget.cardInfo.stopName, small: true,)
             ],
           ),
         )

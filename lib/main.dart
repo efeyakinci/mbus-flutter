@@ -9,45 +9,43 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:logging/logging.dart';
 import 'package:mbus/dialogs/message_dialog.dart';
-import 'package:mbus/interfaces/BootlegNotifier.dart';
-import 'package:mbus/favorites/Favorites.dart';
-import 'package:mbus/GlobalConstants.dart';
-import 'package:mbus/map/MainMap.dart';
-import 'package:mbus/onboarding/Onboarding.dart';
+import 'package:mbus/favorites/favorites.dart';
+import 'package:mbus/map/main_map.dart';
+import 'package:mbus/onboarding/onboarding.dart';
 import 'package:bitmap/bitmap.dart';
-import 'package:mbus/settings/Settings.dart';
+import 'package:mbus/settings/settings.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/mbus_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';
+import 'package:mbus/map/data_types.dart';
+import 'package:mbus/services/asset_loader.dart';
+import 'package:mbus/services/notification_service.dart';
+import 'package:mbus/state/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/settings_state.dart';
+import 'package:mbus/preferences_keys.dart';
 
-
-
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   Logger.root.level = Level.INFO;
   Logger.root.onRecord.listen((record) {
     print('[${record.level.name}] ${record.time}: ${record.message}');
   });
 
-  runApp(MyApp());
-}
+  final navKey = GlobalKey<NavigatorState>();
 
-WidgetBuilder getStartupMessageDialog(dynamic res) {
-  final title = res['title'] ?? "Update Notes!";
-  final message = res['message'] ?? "No message found";
-  final id = res['id'] ?? "-1";
-  final actions = [
-    DialogAction("Dismiss", () async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString("dismissedMessageId", id);
-    })
-  ];
-
-  return getMessageDialog(DialogData(title, message, actions));
+  runApp(ProviderScope(
+    overrides: [navigatorKeyProvider.overrideWithValue(navKey)],
+    child: MyApp(navigatorKey: navKey),
+  ));
 }
 
 class MyApp extends StatelessWidget {
+  final GlobalKey<NavigatorState> navigatorKey;
+  const MyApp({Key? key, required this.navigatorKey}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -55,43 +53,43 @@ class MyApp extends StatelessWidget {
         child: MaterialApp(
       title: 'MBus',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: ThemeData(
           primaryColor: Colors.white,
-          appBarTheme: AppBarTheme(
+          appBarTheme: const AppBarTheme(
             backgroundColor: Colors.white,
             iconTheme: IconThemeData(
               color: Colors.black, //change your color here
             ),
           )),
-      home: DefaultTabController(length: 3, child: OnBoardingSwitcher()),
+      home: const DefaultTabController(length: 3, child: OnBoardingSwitcher()),
     ));
   }
 }
 
 class OnBoardingSwitcher extends StatefulWidget {
+  const OnBoardingSwitcher({Key? key}) : super(key: key);
+  @override
   createState() => _OnBoardingSwitcherState();
 }
 
 class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
     with WidgetsBindingObserver {
-  bool _hasBeenOnboardedReturned = false;
   bool _hasBeenOnboarded = false;
-  bool _hasCheckedNewAssets = false;
-  bool _currentlyCheckingAssets = false;
-  bool _currentlyMessageShowing = false;
   bool _isLoaded = false;
-  Set<RouteData> selectedRoutes = Set<RouteData>();
-  GlobalConstants globalConstants = GlobalConstants();
-  final log = new Logger("main.dart");
+  Set<RouteData> selectedRoutes = <RouteData>{};
+
+  final log = Logger("main.dart");
+  final AssetLoader _assetLoader = AssetLoader();
+  final NotificationService _notificationService = NotificationService();
 
   Future<void> _checkIfOnboarded() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _hasBeenOnboardedReturned = true;
-      _hasBeenOnboarded = prefs.getBool("onboarded") ?? false;
+      _hasBeenOnboarded = prefs.getBool(PrefKeys.onboarded) ?? false;
     });
     if (_hasBeenOnboarded) {
-      _checkMessages();
+      _notificationService.checkMessages(context);
     }
   }
 
@@ -104,248 +102,46 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
         permission = await Geolocator.requestPermission();
       }
     }
-    await prefs.setBool("onboarded", true);
+    await prefs.setBool(PrefKeys.onboarded, true);
     setState(() {
       _hasBeenOnboarded = true;
     });
   }
 
-  Future<void> _checkMessages() async {
-    if (_currentlyMessageShowing) {
-      return;
-    }
-    _currentlyMessageShowing = true;
-    try {
-      final res = jsonDecode(await NetworkUtils.getWithErrorHandling(
-          context, "get-startup-messages"));
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String dismissedMessageId =
-          prefs.getString("dismissedMessageId") ?? "None";
-      final String messageId = res['id'] ?? "-1";
-
-      if (double.parse(res['buildVersion']) > GlobalConstants.BUILD_VERSION &&
-          messageId != dismissedMessageId) {
-        await showDialog(
-            context: context, builder: getStartupMessageDialog(res));
-        _currentlyMessageShowing = false;
-      }
-
-      log.info("Got startup messages");
-    } catch (e) {
-      _currentlyMessageShowing = false;
-      NetworkUtils.createNetworkError();
-      return;
-    }
-  }
-
-  Future<void> _checkUpdateNotes() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool updateNotesDismissed = prefs.getBool("updateNotesDismissed") ?? false;
-
-    if (updateNotesDismissed) {
-      return;
-    }
-
-    Map<String, dynamic> notes = jsonDecode(
-        await NetworkUtils.getWithErrorHandling(context, 'getUpdateNotes'));
-
-    log.info("Got update notes");
-
-    if (notes['version'] != GlobalConstants.BUILD_VERSION.toString()) {
-      return;
-    }
-
-    showDialog(
-        context: context,
-        builder: (context) => Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10.0)),
-              child: Container(
-                // set the minimum height of the dialog to 200
-                constraints: BoxConstraints(maxHeight: 500.0),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Center(
-                          child: Text(
-                        "Update Notes!",
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      )),
-                      SizedBox(
-                        height: 20,
-                      ),
-                      // Text container that scrolls if the text is too long and shrinks if the text is short
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SingleChildScrollView(
-                            child: Text(
-                              notes["message"] ?? "No message found",
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          )
-                        ],
-                      ),
-                      SizedBox(
-                        height: 10,
-                      ),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            child: Text("Dismiss"),
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ));
-  }
-
   Future<void> getSelectedRoutes() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? storedSelections = prefs.getString('selectedRoutes');
+    final String? storedSelections = prefs.getString(PrefKeys.selectedRoutes);
 
     if (storedSelections == null || storedSelections.isEmpty) {
       return;
     }
 
     setState(() {
-      jsonDecode(storedSelections!).forEach((e) {
-        selectedRoutes.add(new RouteData(e['routeId'], e['routeName']));
+      jsonDecode(storedSelections).forEach((e) {
+        selectedRoutes.add(RouteData(e['routeId'], e['routeName']));
       });
     });
 
     log.info("Got selected routes");
   }
 
-  Future<void> _checkNewAssets() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int curInfoVersion = prefs.getInt('curInfoVersion') ?? -1;
-    DateTime prevCheck = DateTime.parse(
-        prefs.getString("lastCheckedAssets") ?? "1969-07-20 20:18:04Z");
-    int serverInfoVersion = -1;
-
-    if (_currentlyCheckingAssets) {
-      return;
-    }
-
-    _currentlyCheckingAssets = true;
-    try {
-      final res = jsonDecode(await NetworkUtils.getWithErrorHandling(
-          context, "getRouteInfoVersion"));
-
-      serverInfoVersion = res['version'] ?? 0;
-      final Map<String, dynamic> storedInfo =
-          jsonDecode(prefs.getString("routeInformation") ?? "{}");
-
-      if (curInfoVersion < serverInfoVersion ||
-          storedInfo.isEmpty ||
-          DateTime.now().difference(prevCheck).inDays > 5) {
-        bool isColorBlindMode = prefs.getBool("isColorBlindEnabled") ?? false;
-        final res = jsonDecode(await NetworkUtils.getWithErrorHandling(context,
-            'getRouteInformation?colorblind=${isColorBlindMode ? "Y" : "N"}'));
-
-        if (res['metadata'] != null &&
-            res['metadata']?['version'] != null &&
-            res['metadata']['version'] is int) {
-          await DefaultCacheManager().emptyCache();
-          await prefs.setString('lastCheckedAssets', DateTime.now().toString());
-          await prefs.setInt('curInfoVersion', res['metadata']['version']);
-          await prefs.setString('routeInformation', jsonEncode(res));
-          setState(() {
-            globalConstants.updateRouteInformation(res);
-            _hasCheckedNewAssets = true;
-          });
-        }
-      } else {
-        setState(() {
-          globalConstants.updateRouteInformation(storedInfo);
-          _hasCheckedNewAssets = true;
-        });
-        log.info("Got new assets");
-      }
-    } catch (e, stacktrace) {
-      setState(() {
-        _hasCheckedNewAssets = true;
-      });
-      log.severe("Error checking for new assets", e, stacktrace);
-    }
-    _currentlyCheckingAssets = false;
-  }
-
-  // Loads and resizes bus images given a path to the image
-  Future<BitmapDescriptor> getBusBitmap(String pathToImage,
-      {width: 124}) async {
-    final image_bmap = await Bitmap.fromProvider(AssetImage(pathToImage));
-    final image = BitmapDescriptor.fromBytes(
-        image_bmap.apply(BitmapResize.to(width: width)).buildHeaded());
-    return image;
-  }
-
-  Future<void> _loadBusImages() async {
-    final BUS_WIDTH = (MediaQuery.of(context).devicePixelRatio * 40).toInt();
-    final STOP_WIDTH = (MediaQuery.of(context).devicePixelRatio * 22).toInt();
-
-    final markerImages = GlobalConstants().marker_images;
-    // Load bus stop image
-    markerImages["BUS_STOP"] =
-        await getBusBitmap("assets/bus_stop.png", width: STOP_WIDTH);
-
-    final prefs = await SharedPreferences.getInstance();
-    final isColorblind = prefs.getBool("isColorBlindEnabled") ?? false;
-
-    for (String routeIdentifier
-        in GlobalConstants().ROUTE_ID_TO_ROUTE_NAME.keys) {
-      late ImageProvider _provider;
-
-      // Load bus image (tries lookup in cache) or use default if it fails
-      _provider = await CachedNetworkImageProvider(
-          "$BACKEND_URL/getVehicleImage/${routeIdentifier}?colorblind=${isColorblind ? "Y" : "N"}",
-          errorListener: (final error) {
-            log.warning("Error loading bus image for $routeIdentifier: $error | Request sent to: $BACKEND_URL/getVehicleImage/${routeIdentifier}?colorblind=${isColorblind ? "Y" : "N"}");
-            _provider = AssetImage('assets/bus_blue.png');
-      });
-
-      log.info("Loading bus image for $routeIdentifier");
-
-      // Resize bus image and add to map
-      markerImages[routeIdentifier] = await BitmapDescriptor.fromBytes(
-          (await Bitmap.fromProvider(_provider))
-              .apply(BitmapResize.to(width: BUS_WIDTH))
-              .buildHeaded());
-    }
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkNewAssets();
-      _checkMessages();
+      _assetLoader.checkNewAssets(context);
+      _notificationService.checkMessages(context);
     }
   }
 
   void loadData() async {
     await Future.wait([
       getSelectedRoutes(),
-      _checkNewAssets(),
+      _assetLoader.checkNewAssets(context),
       _checkIfOnboarded(),
-      _checkUpdateNotes(),
+      _notificationService.checkUpdateNotes(context),
     ]);
     // depends on _checkNewAssets
-    await _loadBusImages();
+    await _assetLoader.loadBusImages(context);
     setState(() {
       _isLoaded = true;
     });
@@ -367,23 +163,23 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasBeenOnboardedReturned || !_isLoaded) {
+    if (!_isLoaded) {
       return Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image(
-                image: AssetImage('assets/mbus_logo.png'),
+                image: const AssetImage('assets/mbus_logo.png'),
                 width: MediaQuery.of(context).size.width * 0.75,
               ),
-              SizedBox(height: 60),
-              CircularProgressIndicator(color: MICHIGAN_MAIZE),
-              SizedBox(height: 10),
-              Text("Loading funny bus pictures",
+              const SizedBox(height: 60),
+              const CircularProgressIndicator(color: MICHIGAN_MAIZE),
+              const SizedBox(height: 10),
+              const Text("Loading funny bus pictures",
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
-              SelectableText(
+              const SizedBox(height: 10),
+              const SelectableText(
                   "If assets do not load, check www.efeakinci.com/mbus for updates.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Colors.grey))
@@ -402,9 +198,9 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
 }
 
 class NavigationContainer extends StatefulWidget {
-  Set<RouteData> _selectedRoutes;
+  final Set<RouteData> _selectedRoutes;
 
-  NavigationContainer(this._selectedRoutes);
+  const NavigationContainer(this._selectedRoutes, {Key? key}) : super(key: key);
 
   @override
   _NavigationContainerState createState() => _NavigationContainerState();
@@ -412,22 +208,23 @@ class NavigationContainer extends StatefulWidget {
 
 class _NavigationContainerState extends State<NavigationContainer> {
   int _currentIndex = 0;
-  BootlegNotifier favoritesNotifier = BootlegNotifier();
-  Set<RouteData> selectedRoutes = {};
+  final ChangeNotifier favoritesNotifier = ChangeNotifier();
+  late Set<RouteData> selectedRoutes;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedRoutes = widget._selectedRoutes;
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
 
   void _onItemSelected(int index) {
     setState(() {
       _currentIndex = index;
       if (_currentIndex == 1) {
-        favoritesNotifier.notify();
+        favoritesNotifier.notifyListeners();
       }
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
   @override
@@ -435,11 +232,11 @@ class _NavigationContainerState extends State<NavigationContainer> {
     return (Scaffold(
       body: IndexedStack(
         children: [
-          MainMap(widget._selectedRoutes.toSet()),
+          MainMap(selectedRoutes),
           Favorites(favoritesNotifier),
           Settings((Set<RouteData> newRoutes) {
             setState(() {
-              widget._selectedRoutes = newRoutes;
+              selectedRoutes = newRoutes;
             });
           }),
         ],

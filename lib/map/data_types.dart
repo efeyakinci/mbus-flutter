@@ -1,10 +1,7 @@
 import 'dart:collection';
 
-import 'package:flutter/widgets.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:mbus/settings/Settings.dart';
-
-import '../GlobalConstants.dart';
+import 'package:mbus/settings/settings.dart';
 
 abstract class HasRouteId {
   String get routeId;
@@ -59,4 +56,34 @@ class IncomingBus {
   final String route;
 
   IncomingBus(this.busNumber, this.to, this.estTimeMin, this.route);
+}
+
+class MapData {
+  final Set<RouteData> routes;
+  final Set<BusRoute> routeLines;
+  final Set<BusStop> routeStops;
+  final Set<MBus> buses;
+
+  MapData()
+      : routes = new HashSet<RouteData>(),
+        routeLines = new HashSet<BusRoute>(),
+        routeStops = new HashSet<BusStop>(),
+        buses = new HashSet<MBus>();
+
+  void clear() {
+    routes.clear();
+    routeLines.clear();
+    routeStops.clear();
+    buses.clear();
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapData &&
+          runtimeType == other.runtimeType &&
+          routes == other.routes &&
+          routeLines == other.routeLines &&
+          routeStops == other.routeStops &&
+          buses == other.buses;
 }
