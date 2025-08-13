@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mbus/map/animations.dart';
+import 'package:mbus/map/presentation/animations.dart';
 
 import '../../constants.dart';
-import '../data_types.dart';
 import 'next_stop.dart';
 
 // Data display item for a single upcoming stop for a bus information card.

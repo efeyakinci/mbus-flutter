@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mbus/map/animations.dart';
+import 'package:mbus/map/presentation/animations.dart';
 import 'package:mbus/constants.dart';
-import '../data_types.dart';
+import 'package:mbus/map/domain/data_types.dart';
 
 class BusStopCardBody extends StatelessWidget {
   final Future<List<IncomingBus>> future;

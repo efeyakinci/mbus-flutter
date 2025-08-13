@@ -1,3 +1,4 @@
+// ignore_for_file: unused_import
 import 'dart:async';
 import 'dart:collection';
 
@@ -5,7 +6,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:mbus/constants.dart';
-
 
 class MarkerAnimator extends StatefulWidget {
   Set<Marker> dynamicMarkers;
@@ -28,11 +28,10 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
   double tempDiff = 0;
   int? mapId; // unsure
   HashMap<MarkerId, List<double>> markerDeltas = HashMap();
-  static const CameraPosition _annArbor = const CameraPosition(
+  static const CameraPosition _annArbor = CameraPosition(
     target: ANN_ARBOR,
     zoom: 14.4746,
   );
-
 
   void initialize() async {
     _controller.addListener(interpolateMarkers);
@@ -46,7 +45,6 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
     return d < 0 ? d + 360 : d;
   }
   void calculateDeltas() {
-    // Δlat, Δlon, Δrot
     Marker oldMarker;
     widget.dynamicMarkers.forEach((marker) {
       oldMarker = prevMarkers[marker.markerId] ?? marker;
@@ -67,7 +65,7 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
             marker.position.latitude + markerDelta[0] * _controller.value,
             marker.position.longitude + markerDelta[1] * _controller.value);
         final rotation = _clampRotation(marker.rotation - markerDelta[2] * _controller.value);
-        return new Marker(markerId: marker.markerId,
+        return Marker(markerId: marker.markerId,
             anchor: marker.anchor,
             onTap: marker.onTap,
             icon: marker.icon,
@@ -91,7 +89,6 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
     super.dispose();
   }
 
-
   @override
   void didUpdateWidget(MarkerAnimator oldWidget) {
     prevMarkers = {for (var marker in oldWidget.dynamicMarkers) marker.markerId: marker};
@@ -101,7 +98,6 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
     }
     _controller.value = _controller.upperBound;
     _controller.reverse();
-    //curMarkers = widget.markers;
 
     super.didUpdateWidget(oldWidget);
   }
@@ -123,3 +119,7 @@ class _MarkerAnimatorState extends State<MarkerAnimator> with SingleTickerProvid
     );
   }
 }
+
+
+
+

@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mbus/constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 
 class DialogAction {
@@ -37,7 +36,7 @@ WidgetBuilder getMessageDialog(DialogData data) {
             Container(
               constraints: BoxConstraints(maxHeight: 50.0),
               child: Center(
-                  child: Text(data.title ?? "Update Notes!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)
+                  child: Text(data.title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)
               ),
             ),
             SizedBox(height: 10,),
@@ -47,7 +46,7 @@ WidgetBuilder getMessageDialog(DialogData data) {
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: [Text(data.message ?? "No message found", style: TextStyle(fontSize: 16),)],
+                  children: [Text(data.message, style: TextStyle(fontSize: 16),)],
                 ),
               ),
             ),

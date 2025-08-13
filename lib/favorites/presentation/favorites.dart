@@ -4,17 +4,19 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
-import 'package:mbus/state/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mbus/constants.dart';
-import 'package:mbus/map/animations.dart';
-import 'package:mbus/map/data_types.dart';
+import 'package:mbus/state/navigation.dart';
+import 'package:mbus/map/presentation/animations.dart';
+import 'package:mbus/map/domain/data_types.dart';
 import 'package:mbus/map/favorite_button.dart';
-import 'package:mbus/mbus_utils.dart';
+import 'package:mbus/data/providers.dart';
+import 'package:mbus/data/api_errors.dart';
+import 'package:mbus/state/assets_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-
 
 class SavedFavorite extends Equatable{
   final String stopId;
@@ -32,7 +34,6 @@ class SavedFavorite extends Equatable{
   };
 
   List<Object> get props => [stopId, stopName];
-
 }
 
 class FavoritesHeader extends StatelessWidget {
@@ -53,24 +54,21 @@ class FavoritesHeader extends StatelessWidget {
   }
 }
 
-class Favorites extends StatefulWidget {
-  final ChangeNotifier onSwitchedTo;
-  Favorites(this.onSwitchedTo);
+class Favorites extends ConsumerStatefulWidget {
+  const Favorites({Key? key}) : super(key: key);
 
   _FavoritesState createState() => _FavoritesState();
 }
 
-class _FavoritesState extends State<Favorites> {
+class _FavoritesState extends ConsumerState<Favorites> {
   late DateTime lastRefresh;
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   Set<SavedFavorite> prevFavorites = {};
   List<FavoriteCardInfo> cardInformation = [];
   bool makingRequest = false;
-  AppState appState = AppState();
-
+  ProviderSubscription<int>? _tabSubscription;
 
   Future<void> _getFavorites({overrideRefreshChecks = false}) async {
-
     SharedPreferences prefs = await SharedPreferences.getInstance();
     Set<SavedFavorite> favorites = prefs.getStringList("favorites")?.map((e) => SavedFavorite.fromJson(jsonDecode(e))).toSet() ?? {};
     List<FavoriteCardInfo> receivedInfo = [];
@@ -83,16 +81,27 @@ class _FavoritesState extends State<Favorites> {
     setState(() {
       makingRequest = true;
     });
+    final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
     await Future.forEach<SavedFavorite>(favorites, (element) async {
-      final arrivalsRes = await NetworkUtils.getWithErrorHandling(context, "getStopPredictions/${element.stopId}");
-      final arrivalsResJson = jsonDecode(arrivalsRes)['bustime-response'];
-      final List<IncomingBus> busses = [];
-      if (arrivalsResJson['prd'] != null) {
-        arrivalsResJson['prd'].forEach((e) {
-          busses.add(new IncomingBus(e['vid'], e['des'], e['prdctdn'], appState.routeIdToRouteName[e['rt']] ?? "Unknown Route"));
-        });
+      try {
+        final arrivalsResJson = await api.getStopPredictions(element.stopId);
+        final List<IncomingBus> busses = [];
+        if (arrivalsResJson['prd'] != null) {
+          arrivalsResJson['prd'].forEach((e) {
+            final routeMeta = ref.read(routeMetaProvider);
+            final routeIdToName = routeMeta.routeIdToName;
+            final routeName = (routeIdToName[e['rt']] ?? e['rt']).toString();
+            busses.add(IncomingBus(e['vid'], e['des'], e['prdctdn'], routeName));
+          });
+        }
+        receivedInfo.add(FavoriteCardInfo(element.stopId, element.stopName, busses));
+      } on RateLimitException {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Too many requests. Please try again later.')));
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load favorites: ${e.message}')));
       }
-      receivedInfo.add(FavoriteCardInfo(element.stopId, element.stopName, busses));
     });
     lastRefresh = DateTime.now();
     if(!mounted) return;
@@ -107,26 +116,31 @@ class _FavoritesState extends State<Favorites> {
     _refreshController.refreshCompleted();
   }
 
-
   @override
   void initState() {
     super.initState();
     lastRefresh = DateTime.now();
     _getFavorites();
-    widget.onSwitchedTo.addListener(_getFavorites);
+    _tabSubscription = ref.listenManual<int>(
+      currentTabProvider,
+      (prev, next) {
+        if (next == 1) {
+          _getFavorites(overrideRefreshChecks: true);
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
+    _tabSubscription?.close();
     _refreshController.dispose();
-    widget.onSwitchedTo.removeListener(_getFavorites);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return
-    SafeArea(
+    return SafeArea(
       child: makingRequest ?
           Container(
             padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 8),
@@ -178,7 +192,6 @@ class _FavoritesState extends State<Favorites> {
                       else {
                           return CarouselSlider(
                             options: CarouselOptions(
-                              // make height max height of each child
                               height: 800,
                               viewportFraction: 0.9,
                               enlargeFactor: 0,
@@ -222,24 +235,20 @@ class FavoriteCardInfo {
 }
 
 class FavoriteStopCard extends StatefulWidget {
-  FavoriteCardInfo cardInfo;
+  final FavoriteCardInfo cardInfo;
 
   FavoriteStopCard(this.cardInfo);
 
-
   _FavoriteStopCardState createState() => _FavoriteStopCardState();
-
 }
-
 
 class _FavoriteStopCardState extends State<FavoriteStopCard> with AutomaticKeepAliveClientMixin  {
   static const _STOP_NAME_STYLE = TextStyle(fontWeight: FontWeight.w900, fontSize: 28, color: MICHIGAN_BLUE);
   static const _STOP_ID_STYLE = TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.grey);
 
-
-
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Align(
       alignment: Alignment.topCenter,
       child: (
@@ -290,7 +299,6 @@ class _FavoriteStopCardState extends State<FavoriteStopCard> with AutomaticKeepA
 }
 
 class _FavoriteStopArrivalsDisplay extends StatelessWidget {
-
   final IncomingBus bus;
 
   _FavoriteStopArrivalsDisplay(this.bus);
@@ -306,7 +314,6 @@ class _FavoriteStopArrivalsDisplay extends StatelessWidget {
       child: (
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-
             children: [
               Container(child: Text(bus.route.length > 0 ? "${bus.route}" : "Unknown Bus", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 14),)),
               Container(child: Text(bus.estTimeMin == "DUE" ? "Arriving within the next minute." : "In about ${bus.estTimeMin} minutes.", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),)),
@@ -323,45 +330,45 @@ class _FavoriteStopArrivalsDisplay extends StatelessWidget {
 }
 
 class _FavoriteCardSkeleton extends StatelessWidget {
-
   @override
   Widget build(BuildContext context) {
-    return
-      Container(
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        margin: EdgeInsets.fromLTRB(16, 0, 16, 32),
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Color(0xFFD9D9D9),
-                  spreadRadius: 0,
-                  blurRadius: 10,
-                  offset: Offset(4, 4)
-              ),
-              BoxShadow(
-                  color: Colors.white,
-                  spreadRadius: 0,
-                  blurRadius: 10,
-                  offset: Offset(-4, -4)
-              )
-            ]
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CardTextLoadingAnimation(1),
-            Container(
-              width: 64,
-              child: CardTextLoadingAnimation(1),
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      margin: EdgeInsets.fromLTRB(16, 0, 16, 32),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Color(0xFFD9D9D9),
+                spreadRadius: 0,
+                blurRadius: 10,
+                offset: Offset(4, 4)
             ),
-            SizedBox(height: 16,),
-            CardRectangleLoadingAnimation(3, height: 72.0,),
-            SizedBox(height: 16,),
-            CardRectangleLoadingAnimation(1, height: 56.0,)
-          ],
-        ),
-      );
+            BoxShadow(
+                color: Colors.white,
+                spreadRadius: 0,
+                blurRadius: 10,
+                offset: Offset(-4, -4)
+            )
+          ]
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CardTextLoadingAnimation(1),
+          Container(
+            width: 64,
+            child: CardTextLoadingAnimation(1),
+          ),
+          SizedBox(height: 16,),
+          CardRectangleLoadingAnimation(3, height: 72.0,),
+          SizedBox(height: 16,),
+          CardRectangleLoadingAnimation(1, height: 56.0,)
+        ],
+      ),
+    );
   }
 }
+
+

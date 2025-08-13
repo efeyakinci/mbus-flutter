@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:mbus/state/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/state/assets_controller.dart';
 import 'package:mbus/constants.dart';
 
-import '../data_types.dart';
 
-class BusNextStopsCardHeader extends StatelessWidget {
+class BusNextStopsCardHeader extends ConsumerWidget {
   final String busId;
   final String busFullness;
   final String routeId;
@@ -37,13 +37,15 @@ class BusNextStopsCardHeader extends StatelessWidget {
         return "Moderately crowded";
       case "FULL":
         return "Very crowded";
+      case "N/A":
+        return "No data";
       default:
         return "Error";
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -65,7 +67,7 @@ class BusNextStopsCardHeader extends StatelessWidget {
         ),
         Container(
           child: Text(
-            AppState().routeIdToRouteName[routeId] ?? "Unknown Route",
+            ref.read(routeMetaProvider).routeIdToName[routeId] ?? "Unknown Route",
             style: TextStyle(
                 color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 18),
           ),

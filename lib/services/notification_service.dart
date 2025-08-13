@@ -1,10 +1,12 @@
+// ignore_for_file: unused_import
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/dialogs/message_dialog.dart';
-import 'package:mbus/mbus_utils.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/data/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
@@ -26,22 +28,26 @@ class NotificationService {
 
   Future<void> checkMessages(BuildContext context) async {
     try {
-      final res = jsonDecode(await NetworkUtils.getWithErrorHandling(
-          context, "get-startup-messages"));
+      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      final resDto = await api.getStartupMessages();
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final String dismissedMessageId =
           prefs.getString("dismissedMessageId") ?? "None";
-      final String messageId = res['id'] ?? "-1";
+      final String messageId = resDto.id;
 
-      if (double.parse(res['buildVersion']) > BUILD_VERSION &&
+      if (double.parse(resDto.buildVersion) > BUILD_VERSION &&
           messageId != dismissedMessageId) {
         await showDialog(
-            context: context, builder: getStartupMessageDialog(res));
+            context: context,
+            builder: getStartupMessageDialog({
+              'title': resDto.title,
+              'message': resDto.message,
+              'id': resDto.id,
+            }));
       }
 
       log.info("Got startup messages");
     } catch (e) {
-      NetworkUtils.createNetworkError();
       return;
     }
   }
@@ -54,16 +60,17 @@ class NotificationService {
       return;
     }
 
-    Map<String, dynamic> notes = jsonDecode(
-        await NetworkUtils.getWithErrorHandling(context, 'getUpdateNotes'));
+    try {
+      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      final notes = await api.getUpdateNotes();
 
-    log.info("Got update notes");
+      log.info("Got update notes");
 
-    if (notes['version'] != BUILD_VERSION.toString()) {
-      return;
-    }
+      if (notes.version != BUILD_VERSION.toString()) {
+        return;
+      }
 
-    showDialog(
+      showDialog(
         context: context,
         builder: (context) => Dialog(
               shape: RoundedRectangleBorder(
@@ -94,7 +101,7 @@ class NotificationService {
                         children: [
                           SingleChildScrollView(
                             child: Text(
-                              notes["message"] ?? "No message found",
+                               notes.message,
                               style: TextStyle(fontSize: 16),
                             ),
                           )
@@ -120,5 +127,8 @@ class NotificationService {
                 ),
               ),
             ));
+    } catch (e) {
+      return;
+    }
   }
 } 

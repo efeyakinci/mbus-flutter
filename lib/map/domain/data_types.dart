@@ -1,7 +1,7 @@
 import 'dart:collection';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:mbus/settings/settings.dart';
+import 'package:mbus/models/route_data.dart';
 
 abstract class HasRouteId {
   String get routeId;
@@ -42,13 +42,11 @@ class BusRoute implements HasRouteId{
 
   BusRoute(this.routeId, this.polyline);
 
-  // string method
   String toString() {
     return "Route ID: $routeId, Polyline ID: ${polyline.polylineId}";
   }
 }
 
-// Data holder class for arrivals on bus stop cards.
 class IncomingBus {
   final String busNumber;
   final String to;
@@ -65,10 +63,10 @@ class MapData {
   final Set<MBus> buses;
 
   MapData()
-      : routes = new HashSet<RouteData>(),
-        routeLines = new HashSet<BusRoute>(),
-        routeStops = new HashSet<BusStop>(),
-        buses = new HashSet<MBus>();
+      : routes = HashSet<RouteData>(),
+        routeLines = HashSet<BusRoute>(),
+        routeStops = HashSet<BusStop>(),
+        buses = HashSet<MBus>();
 
   void clear() {
     routes.clear();
@@ -87,3 +85,7 @@ class MapData {
           routeStops == other.routeStops &&
           buses == other.buses;
 }
+
+
+
+

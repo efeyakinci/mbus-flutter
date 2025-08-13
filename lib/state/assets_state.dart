@@ -1,36 +1,17 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class AssetsState extends Equatable {
-  final Map<String, Color> routeColors;
-  final Map<String, dynamic> routeIdToRouteName;
-  final Map<String, BitmapDescriptor> markerImages;
+part 'assets_state.freezed.dart';
 
-  const AssetsState({
-    required this.routeColors,
-    required this.routeIdToRouteName,
-    required this.markerImages,
-  });
+@freezed
+abstract class AssetsState with _$AssetsState {
+  const factory AssetsState({
+    @Default(<String, Color>{}) Map<String, Color> routeColors,
+    @Default(<String, dynamic>{}) Map<String, dynamic> routeIdToRouteName,
+    @Default(<String, BitmapDescriptor>{})
+    Map<String, BitmapDescriptor> markerImages,
+  }) = _AssetsState;
 
-  factory AssetsState.initial() => const AssetsState(
-        routeColors: {},
-        routeIdToRouteName: {},
-        markerImages: {},
-      );
-
-  AssetsState copyWith({
-    Map<String, Color>? routeColors,
-    Map<String, dynamic>? routeIdToRouteName,
-    Map<String, BitmapDescriptor>? markerImages,
-  }) {
-    return AssetsState(
-      routeColors: routeColors ?? this.routeColors,
-      routeIdToRouteName: routeIdToRouteName ?? this.routeIdToRouteName,
-      markerImages: markerImages ?? this.markerImages,
-    );
-  }
-
-  @override
-  List<Object?> get props => [routeColors, routeIdToRouteName, markerImages];
-} 
+  factory AssetsState.initial() => const AssetsState();
+}

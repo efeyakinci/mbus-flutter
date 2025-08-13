@@ -12,9 +12,7 @@ class CardRectangleLoadingAnimation extends StatefulWidget {
 }
 
 class _CardRectangleLoadingAnimationState extends State<CardRectangleLoadingAnimation> with SingleTickerProviderStateMixin {
-
   late AnimationController _controller;
-
 
   @override
   void initState() {
@@ -57,7 +55,6 @@ class _CardRectangleLoadingAnimationState extends State<CardRectangleLoadingAnim
   }
 }
 
-
 class CardTextLoadingAnimation extends StatefulWidget {
   final int numRows;
 
@@ -67,9 +64,7 @@ class CardTextLoadingAnimation extends StatefulWidget {
 }
 
 class _CardTextLoadingAnimationState extends State<CardTextLoadingAnimation> with SingleTickerProviderStateMixin {
-
   late AnimationController _controller;
-
 
   @override
   void initState() {
@@ -109,6 +104,9 @@ class _CardTextLoadingAnimationState extends State<CardTextLoadingAnimation> wit
   void dispose() {
     _controller.dispose();
     super.dispose();
-
   }
 }
+
+
+
+

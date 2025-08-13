@@ -1,32 +1,31 @@
-import 'dart:convert';
 
-import 'package:cached_network_image/cached_network_image.dart';
+// import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+// import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:logging/logging.dart';
-import 'package:mbus/dialogs/message_dialog.dart';
-import 'package:mbus/favorites/favorites.dart';
-import 'package:mbus/map/main_map.dart';
+// import 'package:mbus/dialogs/message_dialog.dart';
+import 'package:mbus/favorites/presentation/favorites.dart';
+import 'package:mbus/map/presentation/main_map.dart';
 import 'package:mbus/onboarding/onboarding.dart';
-import 'package:bitmap/bitmap.dart';
-import 'package:mbus/settings/settings.dart';
+// import 'package:bitmap/bitmap.dart';
+import 'package:mbus/settings/presentation/settings.dart';
 import 'package:mbus/constants.dart';
-import 'package:mbus/mbus_utils.dart';
+// import 'package:mbus/mbus_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';
-import 'package:mbus/map/data_types.dart';
-import 'package:mbus/services/asset_loader.dart';
+import 'package:mbus/models/route_data.dart';
+import 'package:mbus/data/providers.dart';
+import 'package:mbus/repositories/settings_repository.dart';
 import 'package:mbus/services/notification_service.dart';
-import 'package:mbus/state/app_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mbus/state/assets_controller.dart';
-import 'package:mbus/state/settings_state.dart';
-import 'package:mbus/preferences_keys.dart';
+import 'package:mbus/state/navigation.dart';
+import 'package:mbus/state/settings_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,19 +35,24 @@ Future<void> main() async {
   });
 
   final navKey = GlobalKey<NavigatorState>();
+  final prefs = await SharedPreferences.getInstance();
 
   runApp(ProviderScope(
-    overrides: [navigatorKeyProvider.overrideWithValue(navKey)],
+    overrides: [
+      navigatorKeyProvider.overrideWithValue(navKey),
+      sharedPreferencesProvider.overrideWith((ref) async => prefs),
+      settingsRepositoryProvider.overrideWithValue(SettingsRepository(prefs)),
+    ],
     child: MyApp(navigatorKey: navKey),
   ));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   const MyApp({Key? key, required this.navigatorKey}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Phoenix(
         child: MaterialApp(
       title: 'MBus',
@@ -67,34 +71,32 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class OnBoardingSwitcher extends StatefulWidget {
+class OnBoardingSwitcher extends ConsumerStatefulWidget {
   const OnBoardingSwitcher({Key? key}) : super(key: key);
   @override
   createState() => _OnBoardingSwitcherState();
 }
 
-class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
+class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
     with WidgetsBindingObserver {
   bool _hasBeenOnboarded = false;
   bool _isLoaded = false;
   Set<RouteData> selectedRoutes = <RouteData>{};
 
   final log = Logger("main.dart");
-  final AssetLoader _assetLoader = AssetLoader();
   final NotificationService _notificationService = NotificationService();
 
   Future<void> _checkIfOnboarded() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final onboarded = ref.read(settingsProvider).hasOnboarded;
     setState(() {
-      _hasBeenOnboarded = prefs.getBool(PrefKeys.onboarded) ?? false;
+      _hasBeenOnboarded = onboarded;
     });
-    if (_hasBeenOnboarded) {
+    if (onboarded) {
       _notificationService.checkMessages(context);
     }
   }
 
   Future<void> _onBoardingComplete() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
     LocationPermission permission;
     if (await Geolocator.isLocationServiceEnabled()) {
       permission = await Geolocator.checkPermission();
@@ -102,33 +104,28 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
         permission = await Geolocator.requestPermission();
       }
     }
-    await prefs.setBool(PrefKeys.onboarded, true);
+    ref.read(settingsProvider.notifier).setOnboarded(true);
     setState(() {
       _hasBeenOnboarded = true;
     });
   }
 
   Future<void> getSelectedRoutes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? storedSelections = prefs.getString(PrefKeys.selectedRoutes);
-
-    if (storedSelections == null || storedSelections.isEmpty) {
-      return;
-    }
-
+    final ids = ref.read(settingsProvider).selectedRouteIds;
+    final idToName = ref.read(routeMetaProvider).routeIdToName;
     setState(() {
-      jsonDecode(storedSelections).forEach((e) {
-        selectedRoutes.add(RouteData(e['routeId'], e['routeName']));
-      });
+      selectedRoutes = ids
+          .map((id) => RouteData(routeId: id, routeName: idToName[id] ?? id))
+          .toSet();
     });
-
     log.info("Got selected routes");
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _assetLoader.checkNewAssets(context);
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+      ref.read(assetsProvider.notifier).refreshAssets(devicePixelRatio: dpr);
       _notificationService.checkMessages(context);
     }
   }
@@ -136,12 +133,12 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
   void loadData() async {
     await Future.wait([
       getSelectedRoutes(),
-      _assetLoader.checkNewAssets(context),
       _checkIfOnboarded(),
       _notificationService.checkUpdateNotes(context),
     ]);
-    // depends on _checkNewAssets
-    await _assetLoader.loadBusImages(context);
+    // Initialize Riverpod assets (route metadata + marker images)
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    await ref.read(assetsProvider.notifier).refreshAssets(devicePixelRatio: dpr);
     setState(() {
       _isLoaded = true;
     });
@@ -197,7 +194,7 @@ class _OnBoardingSwitcherState extends State<OnBoardingSwitcher>
   }
 }
 
-class NavigationContainer extends StatefulWidget {
+class NavigationContainer extends ConsumerStatefulWidget {
   final Set<RouteData> _selectedRoutes;
 
   const NavigationContainer(this._selectedRoutes, {Key? key}) : super(key: key);
@@ -206,9 +203,8 @@ class NavigationContainer extends StatefulWidget {
   _NavigationContainerState createState() => _NavigationContainerState();
 }
 
-class _NavigationContainerState extends State<NavigationContainer> {
-  int _currentIndex = 0;
-  final ChangeNotifier favoritesNotifier = ChangeNotifier();
+class _NavigationContainerState extends ConsumerState<NavigationContainer> {
+  // no-op callback removed
   late Set<RouteData> selectedRoutes;
 
   @override
@@ -219,12 +215,8 @@ class _NavigationContainerState extends State<NavigationContainer> {
   }
 
   void _onItemSelected(int index) {
-    setState(() {
-      _currentIndex = index;
-      if (_currentIndex == 1) {
-        favoritesNotifier.notifyListeners();
-      }
-    });
+    ref.read(currentTabProvider.notifier).state = index;
+    // No-op: Favorites will refresh using pull-to-refresh and its own logic
   }
 
   @override
@@ -232,15 +224,11 @@ class _NavigationContainerState extends State<NavigationContainer> {
     return (Scaffold(
       body: IndexedStack(
         children: [
-          MainMap(selectedRoutes),
-          Favorites(favoritesNotifier),
-          Settings((Set<RouteData> newRoutes) {
-            setState(() {
-              selectedRoutes = newRoutes;
-            });
-          }),
+          const MainMap(),
+          const Favorites(),
+          const Settings(),
         ],
-        index: _currentIndex,
+        index: ref.watch(currentTabProvider),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
@@ -251,7 +239,7 @@ class _NavigationContainerState extends State<NavigationContainer> {
               icon: Icon(CupertinoIcons.doc_plaintext), label: "More")
         ],
         onTap: _onItemSelected,
-        currentIndex: _currentIndex,
+        currentIndex: ref.watch(currentTabProvider),
         selectedItemColor: MICHIGAN_BLUE,
       ),
     ));

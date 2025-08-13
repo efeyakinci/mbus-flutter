@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -9,15 +7,17 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:vibration/vibration.dart';
 import 'package:mbus/about/about_screen.dart';
 import 'package:mbus/dialogs/message_dialog.dart';
-import 'package:mbus/feedback/Feedback.dart';
-import 'package:mbus/map/card_scroll_behavior.dart';
+import 'package:mbus/feedback/presentation/feedback_screen.dart';
+import 'package:mbus/map/presentation/card_scroll_behavior.dart';
 import 'package:mbus/constants.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';
-import 'package:mbus/mbus_utils.dart';
-import 'package:mbus/state/app_state.dart';
+import 'package:mbus/data/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/settings_controller.dart';
+import 'package:mbus/models/route_data.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:equatable/equatable.dart';
 import 'package:mbus/preferences_keys.dart';
 
 const SETTINGS_TITLE_STYLE =
@@ -26,29 +26,6 @@ const ABOUT_TEXT =
     "M-Bus is an application created using the U-M Magic Bus API to provide an unofficial application to track University of Michigan buses. "
     "\n\nThis is not an official U-M application and is not affiliated with U-M in any way."
     "\n\nIf you have any questions or concerns, please do not hesitate to let me know through the feedback form with an email I can contact.";
-
-class RouteData extends Equatable {
-  final String routeId;
-  final String routeName;
-
-  RouteData(this.routeId, this.routeName);
-
-  RouteData.fromJson(Map<String, dynamic> json)
-      : routeId = json['routeId'],
-        routeName = json['routeName'];
-
-  @override
-  List<Object> get props => [routeId];
-
-  Map<String, String> toJson() {
-    return {'routeId': routeId, 'routeName': routeName};
-  }
-
-  @override
-  String toString() {
-    return "[RouteData] Route ID: $routeId, Route Name: $routeName";
-  }
-}
 
 WidgetBuilder getFactoryResetDialog(BuildContext context) {
   final actions = [
@@ -73,7 +50,6 @@ WidgetBuilder getFactoryResetDialog(BuildContext context) {
 }
 
 WidgetBuilder getClearAssetsDialog(BuildContext context) {
-  final AppState appState = AppState();
   final actions = [
     DialogAction(
       "Cancel",
@@ -84,11 +60,14 @@ WidgetBuilder getClearAssetsDialog(BuildContext context) {
       () async {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(PrefKeys.routeInformation, "{}");
-        final routeNames = appState.routeToImage;
+        final routeIds = ProviderScope.containerOf(context, listen: false)
+            .read(routeMetaProvider)
+            .routeIdToName
+            .keys;
 
-        for (final routeName in routeNames.keys) {
-          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeName}?colorblind=Y");
-          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeName}?colorblind=N");
+        for (final routeId in routeIds) {
+          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeId}?colorblind=Y");
+          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeId}?colorblind=N");
         }
 
         DefaultCacheManager().emptyCache().then((_) => Phoenix.rebirth(context));
@@ -103,7 +82,7 @@ WidgetBuilder getClearAssetsDialog(BuildContext context) {
 }
 
 class SwitchOptions extends StatelessWidget {
-  List<SwitchOption> options = [];
+  final List<SwitchOption> options;
 
   SwitchOptions(this.options);
 
@@ -156,12 +135,19 @@ class SwitchOption extends StatelessWidget {
   }
 }
 
-class Settings extends StatefulWidget {
-  final Function(Set<RouteData>) setSelectedRoutes;
+class Settings extends ConsumerWidget {
+  const Settings({super.key});
 
-  Settings(this.setSelectedRoutes);
-
-  _SettingsState createState() => _SettingsState();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    return _SettingsContent(
+      colorblindModeIsEnabled: settings.isColorBlind,
+      onToggleColorblind: () {
+        ref.read(settingsProvider.notifier).toggleColorBlind();
+      },
+    );
+  }
 }
 
 class SettingsSection extends StatelessWidget {
@@ -183,42 +169,16 @@ class SettingsSection extends StatelessWidget {
   }
 }
 
-class _SettingsState extends State<Settings> {
-  bool colorblindModeIsEnabled = false;
+class _SettingsContent extends StatelessWidget {
+  final bool colorblindModeIsEnabled;
+  final VoidCallback onToggleColorblind;
 
-  void _checkIfColorblindModeIsEnabled() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      colorblindModeIsEnabled = prefs.getBool(PrefKeys.colorBlindEnabled) ?? false;
-    });
-  }
-
-  void setColorblindMode(bool value) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefKeys.colorBlindEnabled, value);
-    setState(() {
-      colorblindModeIsEnabled = value;
-    });
-    DialogAction action = DialogAction("OK", () {
-      DefaultCacheManager().emptyCache().then((_) async {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(PrefKeys.routeInformation, "{}");
-        Phoenix.rebirth(context);
-        });
-    });
-    DialogData data = DialogData(
-        "Colorblind Mode",
-        "Colorblind mode has been ${value ? "enabled" : "disabled"}.\n\nThe app will now reload to apply the changes.",
-        [action]);
-    showDialog(context: context, builder: getMessageDialog(data), barrierDismissible: false);
-  }
+  const _SettingsContent({
+    required this.colorblindModeIsEnabled,
+    required this.onToggleColorblind,
+  });
 
   @override
-  void initState() {
-    super.initState();
-    _checkIfColorblindModeIsEnabled();
-  }
-
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
@@ -256,7 +216,7 @@ class _SettingsState extends State<Settings> {
             [
               //SwitchOption("Dark Mode", false, (p0) => null),
               SwitchOption("Colorblind Friendly", colorblindModeIsEnabled,
-                  setColorblindMode),
+                  (v) => onToggleColorblind()),
             ]
           ),
           SettingsSection("Questions or Feedback?"),
@@ -311,11 +271,11 @@ class _SettingsState extends State<Settings> {
 }
 
 class SelectableBusRoute extends StatelessWidget {
-  String name;
-  Color routeColor;
-  bool selected;
-  VoidCallback onClick;
-  VoidCallback onLongClick;
+  final String name;
+  final Color routeColor;
+  final bool selected;
+  final VoidCallback onClick;
+  final VoidCallback onLongClick;
 
   SelectableBusRoute(this.name, this.selected, this.onClick, this.onLongClick,
       this.routeColor);
@@ -326,7 +286,8 @@ class SelectableBusRoute extends StatelessWidget {
       onTap: onClick,
       onLongPress: () async {
         onLongClick();
-        if (await Vibration.hasVibrator() ?? false) {
+        final hasVibrator = await Vibration.hasVibrator();
+        if (hasVibrator == true) {
           Vibration.vibrate(duration: 50);
         }
       },
@@ -381,15 +342,15 @@ class SelectableBusRoute extends StatelessWidget {
   }
 }
 
-class SettingsCard extends StatefulWidget {
+class SettingsCard extends ConsumerStatefulWidget {
   final Function(Set<RouteData>) setSelectedRoutes;
 
-  SettingsCard(this.setSelectedRoutes);
+  SettingsCard(this.setSelectedRoutes, {super.key});
   @override
   _SettingsCardState createState() => _SettingsCardState();
 }
 
-class _SettingsCardState extends State<SettingsCard> {
+class _SettingsCardState extends ConsumerState<SettingsCard> {
   List<RouteData> _routes = [];
   Set<RouteData> selectedRoutes = Set();
   late SharedPreferences prefs;
@@ -402,7 +363,8 @@ class _SettingsCardState extends State<SettingsCard> {
         selectedRoutes.add(route);
       }
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      prefs.setString(PrefKeys.selectedRoutes, jsonEncode(selectedRoutes.toList()));
+      ref.read(settingsProvider.notifier).setSelectedRoutes(
+          selectedRoutes.map((e) => e.routeId).toSet());
     });
   }
 
@@ -411,53 +373,47 @@ class _SettingsCardState extends State<SettingsCard> {
       selectedRoutes.clear();
       selectedRoutes.add(route);
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      prefs.setString(PrefKeys.selectedRoutes, jsonEncode(selectedRoutes.toList()));
+      ref.read(settingsProvider.notifier).setSelectedRoutes(
+          selectedRoutes.map((e) => e.routeId).toSet());
     });
   }
 
   void _getRouteNames() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     prefs = await SharedPreferences.getInstance();
-    final String? storedSelections = prefs.getString('selectedRoutes');
-    if (storedSelections != null) {
-      jsonDecode(storedSelections).forEach((e) {
-        selectedRoutes.add(RouteData.fromJson(e));
-      });
-    }
-    List<String>? cachedSelections = prefs.getStringList('cachedSelections');
-    List? routesJson = [];
+    final selectedIds = ref.read(settingsProvider).selectedRouteIds;
+    final idToName = ref.read(routeMetaProvider).routeIdToName;
+    selectedRoutes = selectedIds
+        .map((id) => RouteData(routeId: id, routeName: idToName[id] ?? id))
+        .toSet();
+    final cachedSelections = prefs.getStringList('cachedSelections');
+    List? routesJson;
     if (cachedSelections != null &&
-        cachedSelections[1] != null &&
+        cachedSelections.length > 1 &&
         DateTime.now()
                 .difference(DateTime.parse(cachedSelections[1]))
                 .inMinutes < 1) {
       routesJson =
           jsonDecode(cachedSelections[0])['bustime-response']['routes'];
     } else {
-      final res = await NetworkUtils.getWithErrorHandling(
-          context, "getSelectableRoutes");
-      routesJson = jsonDecode(res)?['bustime-response']?['routes'] ?? null;
-      if (routesJson == null) {
-        return;
-      }
-      prefs.setStringList('cachedSelections', [res, DateTime.now().toString()]);
+      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      routesJson = (await api.getSelectableRoutes()).routes;
+      prefs.setStringList('cachedSelections', [jsonEncode({'bustime-response': {'routes': routesJson}}), DateTime.now().toString()]);
     }
-    setState(() {
-      _routes =
-          routesJson!.map((e) => new RouteData(e['rt'], e['rtnm'])).toList();
-    });
+    if (routesJson != null) {
+      setState(() {
+        _routes = routesJson!
+            .map((e) => RouteData(routeId: e['rt'], routeName: e['rtnm']))
+            .toList()
+            .cast<RouteData>();
+      });
+    }
   }
 
   @override
   void initState() {
+    super.initState();
     _getRouteNames();
-    NetworkUtils.addListener(() {
-      if (!NetworkUtils.hasNetworkError) {
-        _getRouteNames();
-      }
-    });
   }
 
   @override
@@ -487,7 +443,7 @@ class _SettingsCardState extends State<SettingsCard> {
                   }, () {
                     _onlySelectRoute(e);
                   },
-                      AppState().routeColors[e.routeId] ??
+                      ref.read(routeMetaProvider).routeColors[e.routeId] ??
                           Color(0x00000000))),
               SizedBox(height: 8),
               Row(
@@ -515,3 +471,5 @@ class _SettingsCardState extends State<SettingsCard> {
     );
   }
 }
+
+

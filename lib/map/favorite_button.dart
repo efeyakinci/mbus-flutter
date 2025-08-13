@@ -4,11 +4,11 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:mbus/favorites/favorites.dart';
+import 'package:mbus/favorites/presentation/favorites.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants.dart';
-import 'animations.dart';
+import 'presentation/animations.dart';
 
 class BusStopCardFavoriteButton extends StatefulWidget {
   final String busStopId;

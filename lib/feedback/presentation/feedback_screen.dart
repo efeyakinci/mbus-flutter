@@ -1,9 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mbus/constants.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/data/providers.dart';
+import 'package:mbus/data/api_errors.dart';
 
 enum SUBMISSION_STATES {
   PRE_SUBMIT,
@@ -26,24 +26,21 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     setState(() {
       submissionState = SUBMISSION_STATES.SUBMITTING;
     });
-    final res = await http.post(
-      Uri.parse("https://www.efeakinci.host/mbus/api/give-feedback"),
-        headers: <String, String>{
-          'Content-Type': 'application/json',
-        },
-      body: jsonEncode(<String, String> {
-        "feedbackBody": feedback
-      })
-    );
-    setState(() {
-      if (res.statusCode == 200) {
+    try {
+      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      await api.giveFeedback(feedback);
+      setState(() {
         submissionState = SUBMISSION_STATES.SUCCESS;
-      } else if (res.statusCode == 401) {
+      });
+    } on RateLimitException {
+      setState(() {
         submissionState = SUBMISSION_STATES.TOO_MANY_REQUESTS;
-      } else {
+      });
+    } catch (_) {
+      setState(() {
         submissionState = SUBMISSION_STATES.FAILED;
-      }
-    });
+      });
+    }
 
   }
 
@@ -108,3 +105,5 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     );
   }
 }
+
+

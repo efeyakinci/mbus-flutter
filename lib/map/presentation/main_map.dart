@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
-import 'dart:convert';
 
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -8,16 +6,21 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:mbus/map/bus_tracker_card/bus_tracker_card.dart';
-import 'package:mbus/map/marker_animator.dart';
-import 'package:mbus/settings/settings.dart';
+import 'package:mbus/map/presentation/marker_animator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/models/route_data.dart';
+import 'package:mbus/settings/presentation/settings.dart';
 import 'package:mbus/constants.dart';
-import 'package:mbus/mbus_utils.dart';
-import 'package:mbus/state/app_state.dart';
+import 'package:mbus/data/providers.dart';
+import 'package:mbus/map/infrastructure/route_repository.dart' as repos;
+import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/settings_controller.dart';
+import 'package:mbus/state/settings_state.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import './data_types.dart';
-import 'bus_stop_card/bus_stop_card.dart';
+import 'package:mbus/map/domain/data_types.dart';
+import 'package:mbus/map/bus_stop_card/bus_stop_card.dart';
 
 class MyLocationButton extends StatelessWidget {
   final void Function() onClick;
@@ -85,7 +88,6 @@ class MapButtons extends StatelessWidget {
   }
 }
 
-// iOS version of the map (iOS interpolates markers automatically)
 class MainGmap extends StatelessWidget {
   final Completer<GoogleMapController> mapController;
   final Set<Marker> markers;
@@ -129,7 +131,6 @@ class MainGmap extends StatelessWidget {
   }
 }
 
-// Android version of the map (needs to use MarkerAnimator to animate markers)
 class MainAndroidMap extends StatelessWidget {
   final Completer<GoogleMapController> mapController;
   final Set<Polyline> routeLines;
@@ -164,7 +165,6 @@ class MainAndroidMap extends StatelessWidget {
   }
 }
 
-// Button that lets the user choose which routes to show on the map
 class RouteChooser extends StatelessWidget {
   final Function(Set<RouteData>) onRouteButtonClick;
 
@@ -209,28 +209,17 @@ class RouteChooser extends StatelessWidget {
   }
 }
 
-class MainMap extends StatefulWidget {
-  final Set<RouteData> selectedRoutes;
-
-  const MainMap(this.selectedRoutes, {Key? key}) : super(key: key);
+class MainMap extends ConsumerStatefulWidget {
+  const MainMap({Key? key}) : super(key: key);
 
   @override
   _MainMapState createState() => _MainMapState();
 }
 
-class _MainMapState extends State<MainMap> {
-  final AppState appState = AppState();
-  // Google Map Controller
+class _MainMapState extends ConsumerState<MainMap> {
   final Completer<GoogleMapController> _mapController = Completer();
-
-  // Stores selected route IDs
-  late Set<RouteData> _selectedRoutes;
   late Set<String> _selectedRouteIds;
-
-  // Stores all map data received from the server
   final MapData _mapData = MapData();
-
-  // Holds the currently displayed items
   Set<BusRoute> _selectedRouteLines = {};
   Set<BusStop> _selectedRouteStops = {};
   Set<MBus> _selectedBuses = {};
@@ -238,44 +227,52 @@ class _MainMapState extends State<MainMap> {
   Set<Marker> _staticMarkers = {};
   Set<Marker> _dynamicMarkers = {};
   Set<Polyline> _polylines = {};
-  late final Map<String, BitmapDescriptor> _busImages;
-
-  // Shows location button if user has location services enabled
+  late Map<String, BitmapDescriptor> _busImages;
   bool _showMyLocation = false;
-
   double _curMapRotation = 0;
 
-  Timer? _busTimer;
-  Timer? _routeTimer;
+  StreamSubscription<repos.RouteSnapshot>? _routeSub;
+  ProviderSubscription<SettingsState>? _settingsSubscription;
+  repos.RouteSnapshot? _lastSnapshot;
 
   @override
   void initState() {
     super.initState();
-    _selectedRoutes = widget.selectedRoutes;
-    _selectedRouteIds = _selectedRoutes.map((e) => e.routeId).toSet();
-    _busImages = appState.markerImages;
+    _selectedRouteIds =
+        ref.read(settingsProvider).selectedRouteIds.toSet();
+    _busImages = ref.read(markerImagesProvider);
 
     _rebuildSelectedMapFeatures();
     _setUpdateIntervals();
     _checkLocationPermission();
+
+    _settingsSubscription = ref.listenManual<SettingsState>(
+      settingsProvider,
+      (prev, next) {
+        final colorBlindChanged =
+            prev != null && prev.isColorBlind != next.isColorBlind;
+
+        setState(() {
+          _selectedRouteIds = next.selectedRouteIds.toSet();
+          _rebuildSelectedMapFeatures();
+        });
+
+        if (colorBlindChanged) {
+          _refreshAssets(forceRouteInfo: true);
+        }
+      },
+    );
   }
 
   @override
   void didUpdateWidget(MainMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedRoutes != widget.selectedRoutes) {
-      setState(() {
-        _selectedRoutes = widget.selectedRoutes;
-        _selectedRouteIds = _selectedRoutes.map((e) => e.routeId).toSet();
-        _rebuildSelectedMapFeatures();
-      });
-    }
   }
 
   @override
   void dispose() {
-    _busTimer?.cancel();
-    _routeTimer?.cancel();
+    _settingsSubscription?.close();
+    _routeSub?.cancel();
     super.dispose();
   }
 
@@ -287,7 +284,6 @@ class _MainMapState extends State<MainMap> {
     return _busImages[routeId] ?? BitmapDescriptor.defaultMarker;
   }
 
-  // Takes in some data with a routeId and returns the subset of that data that is selected
   Set<T> _getSelectedData<T extends HasRouteId>(Set<T> data) {
     final filtered = data
         .where((element) => _selectedRouteIds.contains(element.routeId))
@@ -296,7 +292,6 @@ class _MainMapState extends State<MainMap> {
     return filtered;
   }
 
-  // Shows the bus stop card (for when a bus stop is clicked on the map)
   void _showBusStopCard(String stopId, String stopName, String routeId, LatLng stopLocation) {
     showBarModalBottomSheet(
         expand: false,
@@ -306,13 +301,12 @@ class _MainMapState extends State<MainMap> {
                   busStopId: stopId,
                   busStopName: stopName,
                   busStopRouteName:
-                      appState.routeIdToRouteName[routeId] ??
+                      ref.read(routeMetaProvider).routeIdToName[routeId] ??
                           "Unknown Route",
                   busStopLocation: stopLocation),
             ));
   }
 
-  // Show the bus card (for when a bus is clicked on the map)
   void _showMBusCard(String busId, String busFullness, String routeId) {
     showBarModalBottomSheet(
         expand: false,
@@ -323,7 +317,6 @@ class _MainMapState extends State<MainMap> {
             ));
   }
 
-  // Take one route from the API response and add its data to the map
   void _addOneBusRoute(String routeId, List<dynamic> subroutes) {
     int subRouteCtr = 0;
     for (final Map<String, dynamic> subRoute in subroutes) {
@@ -338,7 +331,7 @@ class _MainMapState extends State<MainMap> {
       Polyline routeLine = Polyline(
           polylineId: PolylineId(routeId + subRouteCtr.toString()),
           points: points,
-          color: appState.routeColors[routeId] ?? Colors.red,
+          color: ref.read(routeMetaProvider).routeColors[routeId] ?? Colors.red,
           width: 3);
       _mapData.routeLines.add(BusRoute(routeId, routeLine));
       subRouteCtr++;
@@ -355,9 +348,11 @@ class _MainMapState extends State<MainMap> {
         Polyline detourRouteLine = Polyline(
             polylineId: PolylineId(routeId + subRouteCtr.toString()),
             points: detourPoints,
-            color:
-                appState.routeColors[routeId]?.withAlpha(175) ??
-                    Colors.red,
+            color: ref
+                    .read(routeMetaProvider)
+                    .routeColors[routeId]
+                    ?.withAlpha(175) ??
+                Colors.red,
             width: 3);
 
         _mapData.routeLines.add(BusRoute(routeId, detourRouteLine));
@@ -366,31 +361,18 @@ class _MainMapState extends State<MainMap> {
     }
   }
 
-  // Adds all route lines and bus stops to the map
-  void _getBusRoutes() async {
-    final routeLineResponse =
-        await NetworkUtils.getWithErrorHandling(context, 'getAllRoutes');
-    // If there was an error or no routes were found
-    if (routeLineResponse == "{}") return;
-
-    final routeLineJson = jsonDecode(routeLineResponse)['routes'];
-
+  void _setRoutesFromRepo(Map<String, dynamic> routeLineJson) {
     for (final routeId in routeLineJson.keys) {
       _addOneBusRoute(routeId, routeLineJson[routeId]);
     }
-    setState(() {
-      _rebuildSelectedMapFeatures();
-    });
   }
 
-  // Filters all markers to only contain the selected routes
   void _rebuildSelections() {
     _selectedRouteLines = _getSelectedData(_mapData.routeLines);
     _selectedRouteStops = _getSelectedData(_mapData.routeStops);
     _selectedBuses = _getSelectedData(_mapData.buses);
   }
 
-  // Centers the map on the user's location
   void _centerMapOnLocation() async {
     final GoogleMapController controller = await _mapController.future;
     LocationPermission permission;
@@ -429,19 +411,10 @@ class _MainMapState extends State<MainMap> {
             stop.stopId, stop.stopName, stop.routeId, stop.location));
   }
 
-  // Updates buses on the map
-  void _updateBuses() async {
-    final res =
-        await NetworkUtils.getWithErrorHandling(context, "getVehiclePositions");
-    if (res == "{}") return;
+  void _setBusesFromRepo(List<dynamic> buses) {
     _mapData.buses.clear();
-
-    // The API sometimes returns an empty response, so ignore it
-    final json = jsonDecode(res)['buses'] ?? [];
-
-    if (json.length == 0) return;
-
-    for (final bus in json) {
+    if (buses.isEmpty) return;
+    for (final bus in buses) {
       final busMarker = Marker(
           zIndex: 2,
           anchor: const Offset(0.5, 0.5),
@@ -472,7 +445,6 @@ class _MainMapState extends State<MainMap> {
     _polylines = _selectedRouteLines.map((route) => route.polyline).toSet();
   }
 
-  // Rebuilds all markers and polylines
   void _rebuildSelectedMapFeatures() {
     _rebuildSelections();
     _buildDynamicMarkers();
@@ -480,21 +452,19 @@ class _MainMapState extends State<MainMap> {
     _buildPolylines();
   }
 
-  // Update buses every 5 seconds
   void _setUpdateIntervals() {
-    _updateBuses();
-    _getBusRoutes();
-
-    _busTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _updateBuses();
-    });
-
-    _routeTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
-      _getBusRoutes();
+    final repo = ref.read(routeRepositoryProvider);
+    _routeSub = repo.stream.listen((snapshot) {
+      _lastSnapshot = snapshot;
+      _mapData.routeLines.clear();
+      _mapData.routeStops.clear();
+      _setRoutesFromRepo(snapshot.allRoutes);
+      _setBusesFromRepo(snapshot.buses);
+    }, onError: (_) {
+      // Fail fast: let UI continue showing last known state
     });
   }
 
-  // Checks if the user has granted location permissions and sets showMyLocation accordingly
   void _checkLocationPermission() async {
     LocationPermission permission;
 
@@ -506,7 +476,6 @@ class _MainMapState extends State<MainMap> {
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    // If the user has already allowed location permissions, show the location button
     if (permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse) {
       prefs.setBool('noShowLocationWarning', false);
@@ -516,7 +485,6 @@ class _MainMapState extends State<MainMap> {
       return;
     }
 
-    // Try and request location permissions, if the user allows, show the location button
     permission = await Geolocator.requestPermission();
     if (permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse) {
@@ -530,10 +498,31 @@ class _MainMapState extends State<MainMap> {
 
   void _onRouteChooserClick(Set<RouteData> newRoutes) {
     setState(() {
-      _selectedRoutes = newRoutes;
-      _selectedRouteIds = _selectedRoutes.map((route) => route.routeId).toSet();
+      _selectedRouteIds = newRoutes.map((route) => route.routeId).toSet();
+      ref
+          .read(settingsProvider.notifier)
+          .setSelectedRoutes(_selectedRouteIds);
       _rebuildSelectedMapFeatures();
     });
+  }
+
+  Future<void> _refreshAssets({bool forceRouteInfo = false}) async {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    await ref
+        .read(assetsProvider.notifier)
+        .refreshAssets(devicePixelRatio: dpr, forceRouteInfo: forceRouteInfo);
+    _busImages = ref.read(markerImagesProvider);
+
+    if (_lastSnapshot != null) {
+      _mapData.routeLines.clear();
+      _mapData.routeStops.clear();
+      _setRoutesFromRepo(_lastSnapshot!.allRoutes);
+      _setBusesFromRepo(_lastSnapshot!.buses);
+    } else {
+      setState(() {
+        _rebuildSelectedMapFeatures();
+      });
+    }
   }
 
   @override
@@ -565,4 +554,6 @@ class _MainMapState extends State<MainMap> {
       ))),
     );
   }
-} 
+}
+
+

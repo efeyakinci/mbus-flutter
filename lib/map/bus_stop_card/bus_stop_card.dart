@@ -1,5 +1,4 @@
 // Card for bus stop information e.g. arrivals, route name.
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -7,17 +6,18 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:map_launcher/map_launcher.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:mbus/constants.dart';
-import 'package:mbus/map/card_scroll_behavior.dart';
-import 'package:mbus/mbus_utils.dart';
-import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
-import 'package:mbus/state/app_state.dart';
+import 'package:mbus/map/presentation/card_scroll_behavior.dart';
+import 'package:mbus/data/providers.dart';
+ 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mbus/state/assets_controller.dart';
 
 import 'package:mbus/map/bus_stop_card/bus_stop_card_body.dart';
 import 'package:mbus/map/bus_stop_card/bus_stop_card_header.dart';
-import 'package:mbus/map/data_types.dart';
+import 'package:mbus/map/domain/data_types.dart';
 import 'package:mbus/map/favorite_button.dart';
 
-class BusStopCard extends StatelessWidget {
+class BusStopCard extends ConsumerWidget {
   final String busStopId;
   final String busStopName;
   final String? busStopRouteName;
@@ -32,13 +32,11 @@ class BusStopCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     Future<List<IncomingBus>> getBusInfo() async {
-      final res = await NetworkUtils.getWithErrorHandling(
-          context, "getStopPredictions/$busStopId");
-      final resJson = jsonDecode(res)['bustime-response'];
-      final AppState appState = AppState();
-      if (resJson == null) {
+      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      final resJson = await api.getStopPredictions(busStopId);
+      if (resJson.isEmpty) {
         return [];
       }
       List<IncomingBus> _busses = [];
@@ -48,7 +46,7 @@ class BusStopCard extends StatelessWidget {
               e['vid'],
               e['des'],
               e['prdctdn'],
-              appState.routeIdToRouteName[e['rt']] ??
+              ref.read(routeMetaProvider).routeIdToName[e['rt']] ??
                   "Unknown Route"));
         });
       }
