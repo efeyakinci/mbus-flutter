@@ -5,6 +5,7 @@ import 'package:mbus/repositories/assets_repository.dart';
 import 'package:mbus/map/infrastructure/route_repository.dart';
 import 'package:mbus/repositories/settings_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:streaming_shared_preferences/streaming_shared_preferences.dart';
 
 final httpClientProvider = Provider<http.Client>((ref) => http.Client());
 
@@ -30,19 +31,23 @@ final assetsRepositoryProvider = Provider<AssetsRepository>((ref) {
   return AssetsRepository(api);
 });
 
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+final sharedPreferencesProvider =
+    FutureProvider<SharedPreferences>((ref) async {
   return SharedPreferences.getInstance();
 });
 
+final streamingSharedPreferencesProvider =
+    FutureProvider<StreamingSharedPreferences>((ref) async {
+  return StreamingSharedPreferences.instance;
+});
+
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider).maybeWhen(
+  final sprefs = ref.watch(streamingSharedPreferencesProvider).maybeWhen(
         data: (p) => p,
         orElse: () => null,
       );
-  if (prefs == null) {
-    throw StateError('SharedPreferences not ready');
+  if (sprefs == null) {
+    throw StateError('StreamingSharedPreferences not ready');
   }
-  return SettingsRepository(prefs);
+  return SettingsRepository(sprefs);
 });
-
-

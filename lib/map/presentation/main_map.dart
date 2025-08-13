@@ -18,6 +18,7 @@ import 'package:mbus/state/settings_controller.dart';
 import 'package:mbus/state/settings_state.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mbus/map/presentation/map_styles.dart';
 
 import 'package:mbus/map/domain/data_types.dart';
 import 'package:mbus/map/bus_stop_card/bus_stop_card.dart';
@@ -25,10 +26,11 @@ import 'package:mbus/map/bus_stop_card/bus_stop_card.dart';
 class MyLocationButton extends StatelessWidget {
   final void Function() onClick;
 
-  const MyLocationButton({Key? key, required this.onClick}) : super(key: key);
+  const MyLocationButton({super.key, required this.onClick});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       child: GestureDetector(
         onTap: onClick,
@@ -44,16 +46,27 @@ class MyLocationButton extends StatelessWidget {
                     spreadRadius: 1.0,
                     blurRadius: 4.0)
               ],
-              color: MICHIGAN_BLUE),
+              color: isDark
+                  ? Theme.of(context).colorScheme.secondary
+                  : MICHIGAN_BLUE),
           child: const Center(
-            child: Icon(
-              Icons.my_location,
-              color: MICHIGAN_MAIZE,
-              size: 24,
-            ),
+            child: _MyLocationIcon(),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MyLocationIcon extends StatelessWidget {
+  const _MyLocationIcon();
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Icon(
+      Icons.my_location,
+      color: isDark ? MICHIGAN_BLUE : MICHIGAN_MAIZE,
+      size: 24,
     );
   }
 }
@@ -63,10 +76,9 @@ class MapButtons extends StatelessWidget {
   final Function() onLocationClick;
 
   const MapButtons(
-      {Key? key,
+      {super.key,
       required this.onRouteButtonClick,
-      required this.onLocationClick})
-      : super(key: key);
+      required this.onLocationClick});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +100,7 @@ class MapButtons extends StatelessWidget {
   }
 }
 
-class MainGmap extends StatelessWidget {
+class MainGmap extends StatefulWidget {
   final Completer<GoogleMapController> mapController;
   final Set<Marker> markers;
   final Set<Polyline> polylines;
@@ -96,13 +108,30 @@ class MainGmap extends StatelessWidget {
   final Function setMapRotation;
 
   const MainGmap(
-      {Key? key,
+      {super.key,
       required this.mapController,
       required this.markers,
       required this.polylines,
       required this.showMyLocation,
-      required this.setMapRotation})
-      : super(key: key);
+      required this.setMapRotation});
+
+  @override
+  State<MainGmap> createState() => _MainGmapState();
+}
+
+class _MainGmapState extends State<MainGmap> {
+  GoogleMapController? _controller;
+  bool? _lastIsDark;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (_controller != null && _lastIsDark != isDark) {
+      _controller!.setMapStyle(isDark ? darkMapStyle : lightMapStyle);
+      _lastIsDark = isDark;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,24 +139,27 @@ class MainGmap extends StatelessWidget {
       target: LatLng(42.278235, -83.738118),
       zoom: 14.4746,
     );
-
     return GoogleMap(
         mapType: MapType.normal,
         initialCameraPosition: annArbor,
         onMapCreated: (controller) {
-          mapController.complete(controller);
+          widget.mapController.complete(controller);
+          _controller = controller;
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          controller.setMapStyle(isDark ? darkMapStyle : lightMapStyle);
+          _lastIsDark = isDark;
         },
         onCameraMove: (CameraPosition position) {
-          setMapRotation(position.bearing);
+          widget.setMapRotation(position.bearing);
         },
-        markers: markers,
+        markers: widget.markers,
         cameraTargetBounds: CameraTargetBounds(LatLngBounds(
             southwest: const LatLng(42.160243, -83.893041),
             northeast: const LatLng(42.347612, -83.606753))),
         myLocationButtonEnabled: false,
         minMaxZoomPreference: const MinMaxZoomPreference(11, 100),
-        myLocationEnabled: showMyLocation,
-        polylines: polylines);
+        myLocationEnabled: widget.showMyLocation,
+        polylines: widget.polylines);
   }
 }
 
@@ -140,14 +172,13 @@ class MainAndroidMap extends StatelessWidget {
   final Function setMapRotation;
 
   const MainAndroidMap(
-      {Key? key,
+      {super.key,
       required this.mapController,
       required this.routeLines,
       required this.staticMarkers,
       required this.dynamicMarkers,
       required this.showMyLocation,
-      required this.setMapRotation})
-      : super(key: key);
+      required this.setMapRotation});
   @override
   Widget build(BuildContext context) {
     return MarkerAnimator(
@@ -168,11 +199,11 @@ class MainAndroidMap extends StatelessWidget {
 class RouteChooser extends StatelessWidget {
   final Function(Set<RouteData>) onRouteButtonClick;
 
-  const RouteChooser({Key? key, required this.onRouteButtonClick})
-      : super(key: key);
+  const RouteChooser({super.key, required this.onRouteButtonClick});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 24),
@@ -180,6 +211,8 @@ class RouteChooser extends StatelessWidget {
           onTap: () {
             showBarModalBottomSheet(
                 context: context,
+                backgroundColor:
+                    Theme.of(context).bottomSheetTheme.backgroundColor,
                 builder: (context) {
                   return SettingsCard(onRouteButtonClick);
                 });
@@ -196,10 +229,12 @@ class RouteChooser extends StatelessWidget {
                       spreadRadius: 1.0,
                       blurRadius: 4.0)
                 ],
-                color: MICHIGAN_BLUE),
-            child: const Icon(
+                color: isDark
+                    ? Theme.of(context).colorScheme.secondary
+                    : MICHIGAN_BLUE),
+            child: Icon(
               Icons.alt_route_rounded,
-              color: MICHIGAN_MAIZE,
+              color: isDark ? MICHIGAN_BLUE : MICHIGAN_MAIZE,
               size: 24,
             ),
           ),
@@ -210,7 +245,7 @@ class RouteChooser extends StatelessWidget {
 }
 
 class MainMap extends ConsumerStatefulWidget {
-  const MainMap({Key? key}) : super(key: key);
+  const MainMap({super.key});
 
   @override
   _MainMapState createState() => _MainMapState();
@@ -238,8 +273,7 @@ class _MainMapState extends ConsumerState<MainMap> {
   @override
   void initState() {
     super.initState();
-    _selectedRouteIds =
-        ref.read(settingsProvider).selectedRouteIds.toSet();
+    _selectedRouteIds = ref.read(settingsProvider).selectedRouteIds.toSet();
     _busImages = ref.read(markerImagesProvider);
 
     _rebuildSelectedMapFeatures();
@@ -249,17 +283,10 @@ class _MainMapState extends ConsumerState<MainMap> {
     _settingsSubscription = ref.listenManual<SettingsState>(
       settingsProvider,
       (prev, next) {
-        final colorBlindChanged =
-            prev != null && prev.isColorBlind != next.isColorBlind;
-
         setState(() {
           _selectedRouteIds = next.selectedRouteIds.toSet();
           _rebuildSelectedMapFeatures();
         });
-
-        if (colorBlindChanged) {
-          _refreshAssets(forceRouteInfo: true);
-        }
       },
     );
   }
@@ -281,7 +308,8 @@ class _MainMapState extends ConsumerState<MainMap> {
   }
 
   BitmapDescriptor _getBusImage(String routeId) {
-    return _busImages[routeId] ?? BitmapDescriptor.defaultMarker;
+    final key = _busImages.containsKey(routeId) ? routeId : routeId.trim();
+    return _busImages[key] ?? BitmapDescriptor.defaultMarker;
   }
 
   Set<T> _getSelectedData<T extends HasRouteId>(Set<T> data) {
@@ -292,10 +320,12 @@ class _MainMapState extends ConsumerState<MainMap> {
     return filtered;
   }
 
-  void _showBusStopCard(String stopId, String stopName, String routeId, LatLng stopLocation) {
+  void _showBusStopCard(
+      String stopId, String stopName, String routeId, LatLng stopLocation) {
     showBarModalBottomSheet(
         expand: false,
         context: context,
+        backgroundColor: Theme.of(context).bottomSheetTheme.backgroundColor,
         builder: (context) => Container(
               child: BusStopCard(
                   busStopId: stopId,
@@ -311,6 +341,7 @@ class _MainMapState extends ConsumerState<MainMap> {
     showBarModalBottomSheet(
         expand: false,
         context: context,
+        backgroundColor: Theme.of(context).bottomSheetTheme.backgroundColor,
         builder: (context) => Container(
               child: BusNextStopsCard(
                   busId: busId, busFullness: busFullness, routeId: routeId),
@@ -368,9 +399,15 @@ class _MainMapState extends ConsumerState<MainMap> {
   }
 
   void _rebuildSelections() {
-    _selectedRouteLines = _getSelectedData(_mapData.routeLines);
-    _selectedRouteStops = _getSelectedData(_mapData.routeStops);
-    _selectedBuses = _getSelectedData(_mapData.buses);
+    final selectedIds = _selectedRouteIds;
+    _selectedRouteLines = _mapData.routeLines
+        .where((e) => selectedIds.contains(e.routeId))
+        .toSet();
+    _selectedRouteStops = _mapData.routeStops
+        .where((e) => selectedIds.contains(e.routeId))
+        .toSet();
+    _selectedBuses =
+        _mapData.buses.where((e) => selectedIds.contains(e.routeId)).toSet();
   }
 
   void _centerMapOnLocation() async {
@@ -422,8 +459,8 @@ class _MainMapState extends ConsumerState<MainMap> {
           position: LatLng(double.parse(bus['lat']), double.parse(bus['lon'])),
           icon: _getBusImage(bus['rt']),
           rotation: double.parse(bus['hdg']) - _curMapRotation,
-          onTap: () =>
-              _showMBusCard(bus['vid'], bus['psgld'] ?? "HALF_EMPTY", bus['rt']),
+          onTap: () => _showMBusCard(
+              bus['vid'], bus['psgld'] ?? "HALF_EMPTY", bus['rt']),
           consumeTapEvents: true);
 
       _mapData.buses.add(MBus(bus['rt'], busMarker));
@@ -499,18 +536,17 @@ class _MainMapState extends ConsumerState<MainMap> {
   void _onRouteChooserClick(Set<RouteData> newRoutes) {
     setState(() {
       _selectedRouteIds = newRoutes.map((route) => route.routeId).toSet();
-      ref
-          .read(settingsProvider.notifier)
-          .setSelectedRoutes(_selectedRouteIds);
+      ref.read(settingsProvider.notifier).setSelectedRoutes(_selectedRouteIds);
       _rebuildSelectedMapFeatures();
     });
   }
 
   Future<void> _refreshAssets({bool forceRouteInfo = false}) async {
     final dpr = MediaQuery.of(context).devicePixelRatio;
-    await ref
-        .read(assetsProvider.notifier)
-        .refreshAssets(devicePixelRatio: dpr, forceRouteInfo: forceRouteInfo);
+    await ref.read(assetsProvider.notifier).refreshAssets(
+        devicePixelRatio: dpr,
+        forceRouteInfo: forceRouteInfo,
+        settings: ref.read(settingsProvider));
     _busImages = ref.read(markerImagesProvider);
 
     if (_lastSnapshot != null) {
@@ -527,8 +563,9 @@ class _MainMapState extends ConsumerState<MainMap> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnnotatedRegion(
-      value: SystemUiOverlayStyle.dark,
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: (Container(
           child: Stack(
         children: [
@@ -555,5 +592,3 @@ class _MainMapState extends ConsumerState<MainMap> {
     );
   }
 }
-
-

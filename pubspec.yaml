@@ -58,6 +58,7 @@ dependencies:
   flutter_riverpod: '>=2.5.1'
   freezed_annotation: '>=2.4.1'
   json_annotation: '>=4.9.0'
+  streaming_shared_preferences: ^2.0.0
 
 dev_dependencies:
   flutter_test:

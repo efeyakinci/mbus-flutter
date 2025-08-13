@@ -8,13 +8,16 @@ import 'package:bitmap/bitmap.dart';
 import 'package:mbus/data/api_client.dart';
 import 'package:mbus/preferences_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mbus/state/settings_state.dart';
 import 'package:mbus/constants.dart';
 
 class AssetsRepository {
   final MBusApiClient api;
   AssetsRepository(this.api);
 
-  Future<void> checkNewAssets({bool forceRouteInfoRefresh = false}) async {
+  Future<void> checkNewAssets(
+      {bool forceRouteInfoRefresh = false,
+      required SettingsState settings}) async {
     final prefs = await SharedPreferences.getInstance();
     final curInfoVersion = prefs.getInt('curInfoVersion') ?? -1;
     final prevCheck = DateTime.parse(
@@ -31,8 +34,8 @@ class AssetsRepository {
         curInfoVersion < serverInfoVersion ||
         storedJson.isEmpty ||
         DateTime.now().difference(prevCheck).inDays > 5) {
-      final isColorBlind = prefs.getBool(PrefKeys.colorBlindEnabled) ?? false;
-      final routeInfo = await api.getRouteInformation(colorblind: isColorBlind);
+      final routeInfo =
+          await api.getRouteInformation(colorblind: settings.isColorBlind);
       final metadata = routeInfo.json['metadata'];
       if (metadata is Map && metadata['version'] is int) {
         await DefaultCacheManager().emptyCache();
@@ -44,19 +47,19 @@ class AssetsRepository {
     }
   }
 
-  Future<BitmapDescriptor> _bitmapFromAsset(String assetPath, {required int width}) async {
+  Future<BitmapDescriptor> _bitmapFromAsset(String assetPath,
+      {required int width}) async {
     final image = await Bitmap.fromProvider(AssetImage(assetPath));
-    return BitmapDescriptor.fromBytes(image.apply(BitmapResize.to(width: width)).buildHeaded());
+    return BitmapDescriptor.fromBytes(
+        image.apply(BitmapResize.to(width: width)).buildHeaded());
   }
 
   Future<Map<String, BitmapDescriptor>> loadBusImages({
     required int busWidth,
     required int stopWidth,
     required Map<String, dynamic> routeIdToRouteName,
+    required SettingsState settings,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final isColorblind = prefs.getBool(PrefKeys.colorBlindEnabled) ?? false;
-
     final images = <String, BitmapDescriptor>{};
     images['BUS_STOP'] =
         await _bitmapFromAsset('assets/bus_stop.png', width: stopWidth);
@@ -64,7 +67,7 @@ class AssetsRepository {
     for (final routeIdentifier in routeIdToRouteName.keys) {
       ImageProvider provider;
       provider = CachedNetworkImageProvider(
-        "$BACKEND_URL/getVehicleImage/$routeIdentifier?colorblind=${isColorblind ? 'Y' : 'N'}",
+        "$BACKEND_URL/getVehicleImage/$routeIdentifier?colorblind=${settings.isColorBlind ? 'Y' : 'N'}",
         errorListener: (_) {},
       );
       try {
@@ -72,12 +75,11 @@ class AssetsRepository {
         images[routeIdentifier] = BitmapDescriptor.fromBytes(
             bmp.apply(BitmapResize.to(width: busWidth)).buildHeaded());
       } catch (_) {
-        images[routeIdentifier] = await _bitmapFromAsset('assets/bus_blue.png', width: busWidth);
+        images[routeIdentifier] =
+            await _bitmapFromAsset('assets/bus_blue.png', width: busWidth);
       }
     }
 
     return images;
   }
 }
-
-

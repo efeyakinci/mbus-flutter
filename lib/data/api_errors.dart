@@ -7,21 +7,18 @@ class ApiException implements Exception {
 }
 
 class NetworkException extends ApiException {
-  NetworkException(String message) : super(message);
+  NetworkException(super.message);
 }
 
 class ServerException extends ApiException {
-  ServerException(String message, {int? statusCode})
-      : super(message, statusCode: statusCode);
+  ServerException(super.message, {super.statusCode});
 }
 
 class ParseException extends ApiException {
-  ParseException(String message) : super(message);
+  ParseException(super.message);
 }
 
 class RateLimitException extends ApiException {
-  RateLimitException(String message, {int? retryAfterSeconds})
-      : super(message, statusCode: 429);
+  RateLimitException(super.message, {int? retryAfterSeconds})
+      : super(statusCode: 429);
 }
-
-

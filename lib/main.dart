@@ -1,7 +1,5 @@
-
 // import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 // import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,8 +14,9 @@ import 'package:mbus/settings/presentation/settings.dart';
 import 'package:mbus/constants.dart';
 // import 'package:mbus/mbus_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:streaming_shared_preferences/streaming_shared_preferences.dart';
+import 'package:mbus/theme/app_theme.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_phoenix/flutter_phoenix.dart';
 import 'package:mbus/models/route_data.dart';
 import 'package:mbus/data/providers.dart';
 import 'package:mbus/repositories/settings_repository.dart';
@@ -36,12 +35,14 @@ Future<void> main() async {
 
   final navKey = GlobalKey<NavigatorState>();
   final prefs = await SharedPreferences.getInstance();
+  final sprefs = await StreamingSharedPreferences.instance;
 
   runApp(ProviderScope(
     overrides: [
       navigatorKeyProvider.overrideWithValue(navKey),
       sharedPreferencesProvider.overrideWith((ref) async => prefs),
-      settingsRepositoryProvider.overrideWithValue(SettingsRepository(prefs)),
+      streamingSharedPreferencesProvider.overrideWith((ref) async => sprefs),
+      settingsRepositoryProvider.overrideWithValue(SettingsRepository(sprefs)),
     ],
     child: MyApp(navigatorKey: navKey),
   ));
@@ -49,30 +50,25 @@ Future<void> main() async {
 
 class MyApp extends ConsumerWidget {
   final GlobalKey<NavigatorState> navigatorKey;
-  const MyApp({Key? key, required this.navigatorKey}) : super(key: key);
+  const MyApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Phoenix(
-        child: MaterialApp(
+    final isDark = ref.watch(settingsProvider).isDarkMode;
+    return MaterialApp(
       title: 'MBus',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
-      theme: ThemeData(
-          primaryColor: Colors.white,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.white,
-            iconTheme: IconThemeData(
-              color: Colors.black, //change your color here
-            ),
-          )),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       home: const DefaultTabController(length: 3, child: OnBoardingSwitcher()),
-    ));
+    );
   }
 }
 
 class OnBoardingSwitcher extends ConsumerStatefulWidget {
-  const OnBoardingSwitcher({Key? key}) : super(key: key);
+  const OnBoardingSwitcher({super.key});
   @override
   createState() => _OnBoardingSwitcherState();
 }
@@ -125,7 +121,8 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final dpr = MediaQuery.of(context).devicePixelRatio;
-      ref.read(assetsProvider.notifier).refreshAssets(devicePixelRatio: dpr);
+      ref.read(assetsProvider.notifier).refreshAssets(
+          devicePixelRatio: dpr, settings: ref.read(settingsProvider));
       _notificationService.checkMessages(context);
     }
   }
@@ -138,7 +135,8 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
     ]);
     // Initialize Riverpod assets (route metadata + marker images)
     final dpr = MediaQuery.of(context).devicePixelRatio;
-    await ref.read(assetsProvider.notifier).refreshAssets(devicePixelRatio: dpr);
+    await ref.read(assetsProvider.notifier).refreshAssets(
+        devicePixelRatio: dpr, settings: ref.read(settingsProvider));
     setState(() {
       _isLoaded = true;
     });
@@ -174,12 +172,12 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
               const CircularProgressIndicator(color: MICHIGAN_MAIZE),
               const SizedBox(height: 10),
               const Text("Loading funny bus pictures",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  style: AppTextStyles.bodyStrong),
               const SizedBox(height: 10),
               const SelectableText(
                   "If assets do not load, check www.efeakinci.com/mbus for updates.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey))
+                  style: AppTextStyles.caption)
             ],
           ),
         ),
@@ -197,7 +195,7 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
 class NavigationContainer extends ConsumerStatefulWidget {
   final Set<RouteData> _selectedRoutes;
 
-  const NavigationContainer(this._selectedRoutes, {Key? key}) : super(key: key);
+  const NavigationContainer(this._selectedRoutes, {super.key});
 
   @override
   _NavigationContainerState createState() => _NavigationContainerState();
@@ -223,12 +221,12 @@ class _NavigationContainerState extends ConsumerState<NavigationContainer> {
   Widget build(BuildContext context) {
     return (Scaffold(
       body: IndexedStack(
+        index: ref.watch(currentTabProvider),
         children: [
           const MainMap(),
           const Favorites(),
           const Settings(),
         ],
-        index: ref.watch(currentTabProvider),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
@@ -240,7 +238,6 @@ class _NavigationContainerState extends ConsumerState<NavigationContainer> {
         ],
         onTap: _onItemSelected,
         currentIndex: ref.watch(currentTabProvider),
-        selectedItemColor: MICHIGAN_BLUE,
       ),
     ));
   }

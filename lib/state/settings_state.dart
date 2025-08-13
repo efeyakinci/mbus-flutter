@@ -12,6 +12,7 @@ class HiveField {
 abstract class SettingsState with _$SettingsState {
   const factory SettingsState({
     @Default(false) bool isColorBlind,
+    @Default(false) bool isDarkMode,
     @Default(false) bool hasOnboarded,
     @Default(<String>[]) List<String> selectedRouteIds,
   }) = _SettingsState;

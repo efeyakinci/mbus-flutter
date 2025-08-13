@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:mbus/constants.dart';
+import 'package:mbus/theme/app_theme.dart';
+import 'package:mbus/map/widgets/outlined_pill_button.dart';
 
 class BusStopCardHeader extends StatelessWidget {
   final String busStopName;
   final void Function() onLaunchDirections;
 
   const BusStopCardHeader(
-      {Key? key, required this.busStopName, required this.onLaunchDirections})
-      : super(key: key);
+      {super.key, required this.busStopName, required this.onLaunchDirections});
 
   @override
   Widget build(BuildContext context) {
@@ -18,30 +18,17 @@ class BusStopCardHeader extends StatelessWidget {
           Flexible(
               child: Text(
             busStopName.replaceAll('  ', ' '),
-            style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 38,
-                color: MICHIGAN_BLUE),
+            style: AppTextStyles.headerStopName
+                .copyWith(color: Theme.of(context).colorScheme.primary),
           )),
         ]),
         SizedBox(
           height: 8,
         ),
-        Container(
-          child: ActionChip(
-              onPressed: onLaunchDirections,
-              avatar: Icon(
-                Icons.directions_walk,
-                color: MICHIGAN_BLUE,
-              ),
-              label: Text(
-                "Directions",
-                style:
-                    TextStyle(color: MICHIGAN_BLUE, fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: Colors.transparent,
-              shape: StadiumBorder(side: BorderSide(color: Colors.grey.shade400))),
-        ),
+        OutlinedPillButton(
+            icon: Icons.directions_walk,
+            label: "Directions",
+            onPressed: onLaunchDirections),
       ],
     );
   }

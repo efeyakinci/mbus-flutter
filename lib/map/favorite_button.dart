@@ -7,8 +7,8 @@ import 'package:flutter/widgets.dart';
 import 'package:mbus/favorites/presentation/favorites.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../constants.dart';
 import 'presentation/animations.dart';
+import 'package:mbus/theme/app_theme.dart';
 
 class BusStopCardFavoriteButton extends StatefulWidget {
   final String busStopId;
@@ -16,11 +16,11 @@ class BusStopCardFavoriteButton extends StatefulWidget {
   final bool small;
 
   const BusStopCardFavoriteButton({
-    Key? key,
+    super.key,
     required this.busStopId,
     required this.busStopName,
     this.small = false,
-  }) : super(key: key);
+  });
 
   @override
   _BusStopCardFavoriteButtonState createState() =>
@@ -45,9 +45,10 @@ class _BusStopCardFavoriteButtonState extends State<BusStopCardFavoriteButton> {
   Future<List<SavedFavorite>> getFavorites() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? favoritesStr = prefs.getStringList("favorites");
-    List<SavedFavorite> favorites =
-        favoritesStr?.map((e) => SavedFavorite.fromJson(jsonDecode(e))).toList() ??
-            [];
+    List<SavedFavorite> favorites = favoritesStr
+            ?.map((e) => SavedFavorite.fromJson(jsonDecode(e)))
+            .toList() ??
+        [];
 
     if (mounted) {
       setState(() {
@@ -55,7 +56,6 @@ class _BusStopCardFavoriteButtonState extends State<BusStopCardFavoriteButton> {
         hasFetchedFavorites = true;
       });
     }
-
 
     return favorites;
   }
@@ -134,15 +134,16 @@ class _BusStopCardFavoriteButtonState extends State<BusStopCardFavoriteButton> {
             ? EdgeInsets.symmetric(vertical: 16, horizontal: 24)
             : EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-            color: isFavorited ? MICHIGAN_MAIZE : MICHIGAN_BLUE,
+            color: isFavorited
+                ? Theme.of(context).colorScheme.secondary
+                : Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(16)),
         child: Center(
             child: Text(
                 isFavorited ? "Remove from Favorites" : "Add to Favorites",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18))),
+                style: AppTextStyles.buttonPrimary.copyWith(
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onPrimary))),
       ),
     );
   }

@@ -7,41 +7,47 @@ abstract class HasRouteId {
   String get routeId;
 }
 
-class BusStop implements HasRouteId{
+class BusStop implements HasRouteId {
   final String stopId;
   final String stopName;
   final LatLng location;
+  @override
   final String routeId;
 
   BusStop(this.stopId, this.stopName, this.location, this.routeId);
 }
 
-class MBus implements HasRouteId{
+class MBus implements HasRouteId {
+  @override
   final String routeId;
   final Marker marker;
 
   MBus(this.routeId, this.marker);
 
+  @override
   String toString() {
     return "Route ID: $routeId";
   }
 }
 
-class BusStopMarker implements HasRouteId{
+class BusStopMarker implements HasRouteId {
   final String stopId;
   final String stopName;
+  @override
   final String routeId;
   final Marker marker;
 
   BusStopMarker(this.stopId, this.stopName, this.routeId, this.marker);
 }
 
-class BusRoute implements HasRouteId{
+class BusRoute implements HasRouteId {
   Polyline polyline;
+  @override
   String routeId;
 
   BusRoute(this.routeId, this.polyline);
 
+  @override
   String toString() {
     return "Route ID: $routeId, Polyline ID: ${polyline.polylineId}";
   }
@@ -85,7 +91,3 @@ class MapData {
           routeStops == other.routeStops &&
           buses == other.buses;
 }
-
-
-
-

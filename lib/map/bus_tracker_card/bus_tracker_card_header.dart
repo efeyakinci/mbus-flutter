@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mbus/state/assets_controller.dart';
-import 'package:mbus/constants.dart';
+import 'package:mbus/theme/app_theme.dart';
+import 'package:mbus/map/widgets/outlined_info_chip.dart';
 
 
 class BusNextStopsCardHeader extends ConsumerWidget {
@@ -10,11 +11,10 @@ class BusNextStopsCardHeader extends ConsumerWidget {
   final String routeId;
 
   const BusNextStopsCardHeader(
-      {Key? key,
+      {super.key,
       required this.busId,
       required this.busFullness,
-      required this.routeId})
-      : super(key: key);
+      required this.routeId});
 
   IconData getFullnessIcon(String fullness) {
     switch (fullness) {
@@ -50,43 +50,28 @@ class BusNextStopsCardHeader extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Michigan API sometimes serves names with double spaces.
             Flexible(
               child: Text(
                 "Bus ${busId}",
-                style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 46,
-                    color: MICHIGAN_BLUE),
+                style: AppTextStyles.headerBusTitle
+                    .copyWith(color: Theme.of(context).colorScheme.primary),
               ),
             ),
           ],
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
         ),
         Container(
+          margin: EdgeInsets.fromLTRB(0, 4, 0, 0),
           child: Text(
             ref.read(routeMetaProvider).routeIdToName[routeId] ?? "Unknown Route",
-            style: TextStyle(
-                color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 18),
+            style: AppTextStyles.body.copyWith(color: Colors.grey, fontWeight: FontWeight.bold),
           ),
-          margin: EdgeInsets.fromLTRB(0, 4, 0, 0),
         ),
         SizedBox(height: 8),
-        Chip(
-            avatar: Icon(
-              getFullnessIcon(busFullness),
-              color: MICHIGAN_BLUE,
-            ),
-            label: Text(
-              getFullnessText(busFullness),
-              style:
-                  TextStyle(color: MICHIGAN_BLUE, fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: Colors.transparent,
-            shape:
-                StadiumBorder(side: BorderSide(color: Colors.grey.shade400))),
+          OutlinedInfoChip(icon: getFullnessIcon(busFullness), label: getFullnessText(busFullness)),
       ],
     );
   }

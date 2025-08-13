@@ -6,14 +6,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 import 'package:mbus/about/about_screen.dart';
 import 'package:mbus/constants.dart';
+import 'package:mbus/theme/app_theme.dart';
 
-const TITLE_STYLE = TextStyle(
-    color: MICHIGAN_BLUE, fontSize: 42, fontWeight: FontWeight.w900);
-const BODY_STYLE = TextStyle(
-    color: Color(0xFF555555), fontSize: 16, fontWeight: FontWeight.normal);
+const TITLE_STYLE =
+    TextStyle(color: MICHIGAN_BLUE, fontSize: 42, fontWeight: FontWeight.w900);
+const BODY_STYLE = AppTextStyles.body;
 
 class RouteButton extends StatelessWidget {
-  const RouteButton({Key? key}) : super(key: key);
+  const RouteButton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +45,7 @@ class RouteButton extends StatelessWidget {
 class OnboardingTermsAndConditions extends StatefulWidget {
   final VoidCallback allowNext;
 
-  const OnboardingTermsAndConditions({Key? key, required this.allowNext})
-      : super(key: key);
+  const OnboardingTermsAndConditions({super.key, required this.allowNext});
 
   @override
   _OnboardingTermsAndConditionsState createState() =>
@@ -80,7 +79,7 @@ class _OnboardingTermsAndConditionsState
             },
             child: const Text(
               "Terms and Conditions",
-              style: TextStyle(fontSize: 18),
+              style: AppTextStyles.body,
             )),
         const SizedBox(
           height: 24,
@@ -100,7 +99,7 @@ class _OnboardingTermsAndConditionsState
 class OnBoardingScreen extends StatefulWidget {
   final VoidCallback onDone;
 
-  const OnBoardingScreen(this.onDone, {Key? key}) : super(key: key);
+  const OnBoardingScreen(this.onDone, {super.key});
 
   @override
   _OnBoardingScreenState createState() => _OnBoardingScreenState();
@@ -122,8 +121,8 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             ),
           )),
           title: "Welcome to MBus!",
-          decoration:
-              const PageDecoration(titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
+          decoration: const PageDecoration(
+              titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
           body:
               "Hey, thanks for downloading MBus!\n\nThis (unofficial) app is designed to help you navigate the U-M bus system. To get started, just tap \"Next\" below!",
         ),
@@ -135,8 +134,8 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
               child: SvgPicture.asset("assets/routes_picture.svg"),
             ),
           )),
-          decoration:
-              const PageDecoration(titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
+          decoration: const PageDecoration(
+              titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
           title: "Routes",
           bodyWidget: RichText(
             textAlign: TextAlign.center,
@@ -188,8 +187,8 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
               ),
             )),
             title: "Buses",
-            decoration:
-                const PageDecoration(titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
+            decoration: const PageDecoration(
+                titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
             bodyWidget: RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
@@ -217,8 +216,8 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                 child: SvgPicture.asset("assets/legalities_picture.svg"),
               ),
             )),
-            decoration:
-                const PageDecoration(titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
+            decoration: const PageDecoration(
+                titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
             title: "Legalities",
             bodyWidget: OnboardingTermsAndConditions(allowNext: () {
               setState(() {
@@ -233,8 +232,8 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
                 child: SvgPicture.asset("assets/current_location_picture.svg"),
               ),
             )),
-            decoration:
-                const PageDecoration(titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
+            decoration: const PageDecoration(
+                titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
             title: "Almost there...",
             body:
                 "When you tap done, you will be prompted for access to your location. Please provide the app access to your precise location to see your current location on the map.\n\nRemember, if you experience any issues, you can contact me through the \"Send Feedback\" option in the \"More\" tab.\n\nThat's all! I hope that you enjoy using M-Bus!"),

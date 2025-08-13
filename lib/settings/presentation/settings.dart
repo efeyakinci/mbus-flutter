@@ -19,9 +19,9 @@ import 'package:mbus/models/route_data.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mbus/preferences_keys.dart';
+import 'package:mbus/theme/app_theme.dart';
 
-const SETTINGS_TITLE_STYLE =
-    TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: MICHIGAN_BLUE);
+const SETTINGS_TITLE_STYLE = AppTextStyles.settingsTitle;
 const ABOUT_TEXT =
     "M-Bus is an application created using the U-M Magic Bus API to provide an unofficial application to track University of Michigan buses. "
     "\n\nThis is not an official U-M application and is not affiliated with U-M in any way."
@@ -66,11 +66,15 @@ WidgetBuilder getClearAssetsDialog(BuildContext context) {
             .keys;
 
         for (final routeId in routeIds) {
-          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeId}?colorblind=Y");
-          await CachedNetworkImage.evictFromCache("$BACKEND_URL/getVehicleImage/${routeId}?colorblind=N");
+          await CachedNetworkImage.evictFromCache(
+              "$BACKEND_URL/getVehicleImage/$routeId?colorblind=Y");
+          await CachedNetworkImage.evictFromCache(
+              "$BACKEND_URL/getVehicleImage/$routeId?colorblind=N");
         }
 
-        DefaultCacheManager().emptyCache().then((_) => Phoenix.rebirth(context));
+        DefaultCacheManager()
+            .emptyCache()
+            .then((_) => Phoenix.rebirth(context));
       },
     ),
   ];
@@ -84,19 +88,23 @@ WidgetBuilder getClearAssetsDialog(BuildContext context) {
 class SwitchOptions extends StatelessWidget {
   final List<SwitchOption> options;
 
-  SwitchOptions(this.options);
+  const SwitchOptions(this.options, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        border: Border.all(color: Colors.grey.shade300),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF1E1E1E)
+            : Colors.grey.shade200,
+        border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade800
+                : Colors.grey.shade300),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: options,
-        
       ),
     );
   }
@@ -107,7 +115,7 @@ class SwitchOption extends StatelessWidget {
   final bool value;
   final Function(bool) onChanged;
 
-  SwitchOption(this.title, this.value, this.onChanged);
+  const SwitchOption(this.title, this.value, this.onChanged, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -118,8 +126,8 @@ class SwitchOption extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: TextStyle(
-                  color: MICHIGAN_BLUE,
+              style: AppTextStyles.body.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 16),
             ),
@@ -143,8 +151,12 @@ class Settings extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     return _SettingsContent(
       colorblindModeIsEnabled: settings.isColorBlind,
+      darkModeIsEnabled: settings.isDarkMode,
       onToggleColorblind: () {
         ref.read(settingsProvider.notifier).toggleColorBlind();
+      },
+      onToggleDarkMode: () {
+        ref.read(settingsProvider.notifier).toggleDarkMode();
       },
     );
   }
@@ -153,29 +165,33 @@ class Settings extends ConsumerWidget {
 class SettingsSection extends StatelessWidget {
   final String title;
 
-  SettingsSection(this.title);
+  const SettingsSection(this.title, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: EdgeInsets.only(bottom: 8, top: 24),
       child: Text(
         title,
-        style: TextStyle(
-            color: MICHIGAN_BLUE, fontWeight: FontWeight.w800, fontSize: 18),
+        style: AppTextStyles.sectionTitle
+            .copyWith(color: Theme.of(context).colorScheme.primary),
         textAlign: TextAlign.center,
       ),
-      padding: EdgeInsets.only(bottom: 8, top: 24),
     );
   }
 }
 
 class _SettingsContent extends StatelessWidget {
   final bool colorblindModeIsEnabled;
+  final bool darkModeIsEnabled;
   final VoidCallback onToggleColorblind;
+  final VoidCallback onToggleDarkMode;
 
   const _SettingsContent({
     required this.colorblindModeIsEnabled,
+    required this.darkModeIsEnabled,
     required this.onToggleColorblind,
+    required this.onToggleDarkMode,
   });
 
   @override
@@ -194,11 +210,9 @@ class _SettingsContent extends StatelessWidget {
             height: 8,
           ),
           Text(
-            "Build: ${BUILD_VERSION}",
+            "Build: $BUILD_VERSION",
             textAlign: TextAlign.center,
-            style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12),
+            style: AppTextStyles.caption,
           ),
           SizedBox(
             height: 32,
@@ -212,45 +226,43 @@ class _SettingsContent extends StatelessWidget {
           ),
           Divider(),
           SettingsSection("Options"),
-          SwitchOptions(
-            [
-              //SwitchOption("Dark Mode", false, (p0) => null),
-              SwitchOption("Colorblind Friendly", colorblindModeIsEnabled,
-                  (v) => onToggleColorblind()),
-            ]
-          ),
+          SwitchOptions([
+            SwitchOption(
+                "Dark Mode", darkModeIsEnabled, (v) => onToggleDarkMode()),
+            SwitchOption("Colorblind Friendly", colorblindModeIsEnabled,
+                (v) => onToggleColorblind()),
+          ]),
           SettingsSection("Questions or Feedback?"),
           ElevatedButton(
-              child: Text("Send Feedback", style: TextStyle(color: Colors.white)),
-              // set color of button
               style: ElevatedButton.styleFrom(
                 backgroundColor: MICHIGAN_BLUE,
               ),
               onPressed: () {
                 Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => FeedbackScreen()));
-              }),
+              },
+              child: Text("Send Feedback", style: AppTextStyles.buttonPrimary)),
           SettingsSection("Troubleshooting"),
           ElevatedButton(
-              child: Text("Clear Asset Cache and Restart", style: TextStyle(color: Colors.white)),
-              // set color of button
               style: ElevatedButton.styleFrom(
                 backgroundColor: MICHIGAN_BLUE,
               ),
               onPressed: () {
                 showDialog(
                     context: context, builder: getClearAssetsDialog(context));
-              }),
+              },
+              child: Text("Clear Asset Cache and Restart",
+                  style: AppTextStyles.buttonPrimary)),
           ElevatedButton(
-              child: Text("Reset to Factory Settings", style: TextStyle(color: Colors.white)),
-              // set color of button
               style: ElevatedButton.styleFrom(
                 backgroundColor: MICHIGAN_BLUE,
               ),
               onPressed: () {
                 showDialog(
                     context: context, builder: getFactoryResetDialog(context));
-              }),
+              },
+              child: Text("Reset to Factory Settings",
+                  style: AppTextStyles.buttonPrimary)),
           SizedBox(
             height: 16,
           ),
@@ -258,7 +270,7 @@ class _SettingsContent extends StatelessWidget {
           CupertinoButton(
               child: Text(
                 "Privacy Policy and Terms & Conditions",
-                style: TextStyle(fontSize: 14),
+                style: AppTextStyles.body.copyWith(fontSize: 14),
               ),
               onPressed: () {
                 Navigator.of(context).push(
@@ -277,8 +289,9 @@ class SelectableBusRoute extends StatelessWidget {
   final VoidCallback onClick;
   final VoidCallback onLongClick;
 
-  SelectableBusRoute(this.name, this.selected, this.onClick, this.onLongClick,
-      this.routeColor);
+  const SelectableBusRoute(
+      this.name, this.selected, this.onClick, this.onLongClick, this.routeColor,
+      {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -296,17 +309,25 @@ class SelectableBusRoute extends StatelessWidget {
         margin: EdgeInsets.fromLTRB(0, 0, 0, 16),
         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         decoration: BoxDecoration(
-            color: selected ? Color(0xFFffdf63) : Colors.white,
+            color: selected
+                ? (Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF3A3000)
+                    : const Color(0xFFffdf63))
+                : Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                  color: Colors.white,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
                   spreadRadius: 0,
                   blurRadius: 4,
                   offset: Offset(-2, -2)),
               BoxShadow(
                   color: selected
-                      ? Color(0xFFD9B83C)
+                      ? (Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF5A4700)
+                          : const Color(0xFFD9B83C))
                       : Colors.black.withOpacity(0.2),
                   spreadRadius: 0,
                   blurRadius: 4,
@@ -327,7 +348,8 @@ class SelectableBusRoute extends StatelessWidget {
                 ),
                 Text(
                   name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: AppTextStyles.body
+                      .copyWith(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -345,26 +367,28 @@ class SelectableBusRoute extends StatelessWidget {
 class SettingsCard extends ConsumerStatefulWidget {
   final Function(Set<RouteData>) setSelectedRoutes;
 
-  SettingsCard(this.setSelectedRoutes, {super.key});
+  const SettingsCard(this.setSelectedRoutes, {super.key});
   @override
   _SettingsCardState createState() => _SettingsCardState();
 }
 
 class _SettingsCardState extends ConsumerState<SettingsCard> {
   List<RouteData> _routes = [];
-  Set<RouteData> selectedRoutes = Set();
+  Set<RouteData> selectedRoutes = {};
   late SharedPreferences prefs;
 
   void _toggleRoute(RouteData route) {
     setState(() {
-      if (selectedRoutes.contains(route)) {
-        selectedRoutes.remove(route);
+      final hasId = selectedRoutes.any((r) => r.routeId == route.routeId);
+      if (hasId) {
+        selectedRoutes.removeWhere((r) => r.routeId == route.routeId);
       } else {
         selectedRoutes.add(route);
       }
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      ref.read(settingsProvider.notifier).setSelectedRoutes(
-          selectedRoutes.map((e) => e.routeId).toSet());
+      ref
+          .read(settingsProvider.notifier)
+          .setSelectedRoutes(selectedRoutes.map((e) => e.routeId).toSet());
     });
   }
 
@@ -373,8 +397,7 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
       selectedRoutes.clear();
       selectedRoutes.add(route);
       widget.setSelectedRoutes(Set.from(selectedRoutes));
-      ref.read(settingsProvider.notifier).setSelectedRoutes(
-          selectedRoutes.map((e) => e.routeId).toSet());
+      ref.read(settingsProvider.notifier).setSelectedRoutes({route.routeId});
     });
   }
 
@@ -392,13 +415,20 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
         cachedSelections.length > 1 &&
         DateTime.now()
                 .difference(DateTime.parse(cachedSelections[1]))
-                .inMinutes < 1) {
+                .inMinutes <
+            1) {
       routesJson =
           jsonDecode(cachedSelections[0])['bustime-response']['routes'];
     } else {
-      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      final api = ProviderScope.containerOf(context, listen: false)
+          .read(apiClientProvider);
       routesJson = (await api.getSelectableRoutes()).routes;
-      prefs.setStringList('cachedSelections', [jsonEncode({'bustime-response': {'routes': routesJson}}), DateTime.now().toString()]);
+      prefs.setStringList('cachedSelections', [
+        jsonEncode({
+          'bustime-response': {'routes': routesJson}
+        }),
+        DateTime.now().toString()
+      ]);
     }
     if (routesJson != null) {
       setState(() {
@@ -427,18 +457,20 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
             children: [
               Text(
                 "Select Routes",
-                style: SETTINGS_TITLE_STYLE,
+                style: SETTINGS_TITLE_STYLE.copyWith(
+                    color: Theme.of(context).colorScheme.primary),
               ),
               SizedBox(height: 4),
               Text(
                 "Tip: Long press a route to only show that route",
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                style: AppTextStyles.body
+                    .copyWith(color: Colors.grey, fontSize: 14),
               ),
               Divider(),
               SizedBox(height: 16),
               if (_routes.isEmpty) CupertinoActivityIndicator(),
-              ..._routes.map((e) => SelectableBusRoute(
-                      e.routeName, selectedRoutes.contains(e), () {
+              ..._routes.map((e) => SelectableBusRoute(e.routeName,
+                      selectedRoutes.any((r) => r.routeId == e.routeId), () {
                     _toggleRoute(e);
                   }, () {
                     _onlySelectRoute(e);
@@ -453,16 +485,20 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
                     onPressed: Navigator.of(context).pop,
                     avatar: Icon(
                       Icons.map,
-                      color: MICHIGAN_BLUE,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     label: Text(
                       "Back to Map",
-                      style: TextStyle(
-                          color: MICHIGAN_BLUE, fontWeight: FontWeight.bold),
+                      style: AppTextStyles.routeDirectionBlue.copyWith(
+                          color: Theme.of(context).colorScheme.primary),
                     ),
                     backgroundColor: Colors.transparent,
                     shape: StadiumBorder(
-                        side: BorderSide(color: Colors.grey.shade400)),
+                        side: BorderSide(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey.shade700
+                                    : Colors.grey.shade400)),
                   )
                 ],
               )
@@ -471,5 +507,3 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
     );
   }
 }
-
-

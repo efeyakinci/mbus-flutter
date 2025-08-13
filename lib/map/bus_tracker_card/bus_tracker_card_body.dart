@@ -1,53 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:mbus/map/presentation/animations.dart';
 
-import '../../constants.dart';
 import 'next_stop.dart';
+import 'package:mbus/theme/app_theme.dart';
+import 'package:mbus/map/widgets/three_line_list_item.dart';
 
 // Data display item for a single upcoming stop for a bus information card.
 class BusNextStopsDisplay extends StatelessWidget {
   final NextStop bus;
 
-  const BusNextStopsDisplay({Key? key, required this.bus}) : super(key: key);
+  const BusNextStopsDisplay({super.key, required this.bus});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-      decoration: BoxDecoration(
-          border: Border(
-              bottom: BorderSide(color: Theme.of(context).dividerColor))),
-      child: (Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-              child: Text(
-            bus.stopName.replaceAll('  ', ' '),
-            style: TextStyle(
-                color: MICHIGAN_BLUE,
-                fontWeight: FontWeight.w800,
-                fontSize: 20),
-          )),
-          Container(
-              child: Text(
-            bus.estTimeMin == "DUE"
-                ? "Arriving within the next minute"
-                : "In about ${bus.estTimeMin} minutes",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          )),
-          Row(
-            children: [
-              Flexible(
-                  child: Text(
-                "Towards ${bus.destination} ",
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-              )),
-            ],
-          )
-        ],
-      )),
+    final bool isDue = bus.estTimeMin == "DUE";
+    return ThreeLineListItem(
+      titleText: bus.stopName.replaceAll('  ', ' '),
+      primaryText: isDue
+          ? "Arriving within the next minute"
+          : "In about ${bus.estTimeMin} minutes",
+      metaText: "Towards ${bus.destination} ",
+      titleStyleOverride: AppTextStyles.routeName.copyWith(fontSize: 20),
+      primaryStyleOverride:
+          AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -55,7 +30,7 @@ class BusNextStopsDisplay extends StatelessWidget {
 class BusTrackerCardBody extends StatelessWidget {
   final Future<List<NextStop>> future;
 
-  const BusTrackerCardBody({Key? key, required this.future}) : super(key: key);
+  const BusTrackerCardBody({super.key, required this.future});
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +41,10 @@ class BusTrackerCardBody extends StatelessWidget {
             return CardTextLoadingAnimation(5);
           } else {
             if (snapshot.hasData && snapshot.data != null) {
-              if (snapshot.data!.length == 0) {
+              if (snapshot.data!.isEmpty) {
                 return Text(
                   "This bus does not currently have any stops scheduled.",
-                  style: TextStyle(fontSize: 18),
+                  style: AppTextStyles.body,
                 );
               }
               return Container(

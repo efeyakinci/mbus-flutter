@@ -5,10 +5,12 @@ import 'package:flutter_svg/svg.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:map_launcher/map_launcher.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+// ignore_for_file: unused_import
 import 'package:mbus/constants.dart';
+import 'package:mbus/theme/app_theme.dart';
 import 'package:mbus/map/presentation/card_scroll_behavior.dart';
 import 'package:mbus/data/providers.dart';
- 
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mbus/state/assets_controller.dart';
 
@@ -16,6 +18,7 @@ import 'package:mbus/map/bus_stop_card/bus_stop_card_body.dart';
 import 'package:mbus/map/bus_stop_card/bus_stop_card_header.dart';
 import 'package:mbus/map/domain/data_types.dart';
 import 'package:mbus/map/favorite_button.dart';
+import 'package:mbus/map/widgets/bottom_sheet_card.dart';
 
 class BusStopCard extends ConsumerWidget {
   final String busStopId;
@@ -24,25 +27,26 @@ class BusStopCard extends ConsumerWidget {
   final LatLng busStopLocation;
 
   const BusStopCard({
-    Key? key,
+    super.key,
     required this.busStopId,
     required this.busStopName,
     this.busStopRouteName,
     required this.busStopLocation,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     Future<List<IncomingBus>> getBusInfo() async {
-      final api = ProviderScope.containerOf(context, listen: false).read(apiClientProvider);
+      final api = ProviderScope.containerOf(context, listen: false)
+          .read(apiClientProvider);
       final resJson = await api.getStopPredictions(busStopId);
       if (resJson.isEmpty) {
         return [];
       }
-      List<IncomingBus> _busses = [];
+      List<IncomingBus> busses = [];
       if (resJson['prd'] != null) {
         resJson['prd'].forEach((e) {
-          _busses.add(new IncomingBus(
+          busses.add(IncomingBus(
               e['vid'],
               e['des'],
               e['prdctdn'],
@@ -50,11 +54,12 @@ class BusStopCard extends ConsumerWidget {
                   "Unknown Route"));
         });
       }
-      return _busses;
+      return busses;
     }
 
     void launchDirectionsSelectionScreen() async {
-      final coords = Coords(busStopLocation.latitude, busStopLocation.longitude);
+      final coords =
+          Coords(busStopLocation.latitude, busStopLocation.longitude);
       final availableMaps = await MapLauncher.installedMaps;
 
       showModalBottomSheet(
@@ -86,46 +91,16 @@ class BusStopCard extends ConsumerWidget {
           });
     }
 
-    return ScrollConfiguration(
-      behavior: CardScrollBehavior(),
-      child: (ListView(
-        shrinkWrap: true,
-        controller: ModalScrollController.of(context),
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                BusStopCardHeader(
-                    busStopName: busStopName,
-                    onLaunchDirections: launchDirectionsSelectionScreen),
-                const SizedBox(
-                  height: 32,
-                ),
-                const Text(
-                  "Arrivals",
-                  style: TextStyle(
-                      color: MICHIGAN_MAIZE,
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800),
-                ),
-                const Divider(),
-                const SizedBox(
-                  height: 8,
-                ),
-                BusStopCardBody(future: getBusInfo()),
-                const SizedBox(height: 16),
-                Container(
-                    width: double.infinity,
-                    child: BusStopCardFavoriteButton(
-                        busStopId: busStopId, busStopName: busStopName)),
-              ],
-            ),
-          )
-        ],
-      )),
+    return BottomSheetCard(
+      header: BusStopCardHeader(
+          busStopName: busStopName,
+          onLaunchDirections: launchDirectionsSelectionScreen),
+      sectionTitle: "Arrivals",
+      body: BusStopCardBody(future: getBusInfo()),
+      footer: SizedBox(
+          width: double.infinity,
+          child: BusStopCardFavoriteButton(
+              busStopId: busStopId, busStopName: busStopName)),
     );
   }
 }

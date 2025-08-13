@@ -16,6 +16,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$SettingsState {
   bool get isColorBlind;
+  bool get isDarkMode;
   bool get hasOnboarded;
   List<String> get selectedRouteIds;
 
@@ -57,7 +58,10 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       _$SettingsStateCopyWithImpl;
   @useResult
   $Res call(
-      {bool isColorBlind, bool hasOnboarded, List<String> selectedRouteIds});
+      {bool isColorBlind,
+      bool isDarkMode,
+      bool hasOnboarded,
+      List<String> selectedRouteIds});
 }
 
 /// @nodoc
@@ -74,6 +78,7 @@ class _$SettingsStateCopyWithImpl<$Res>
   @override
   $Res call({
     Object? isColorBlind = null,
+    Object? isDarkMode = null,
     Object? hasOnboarded = null,
     Object? selectedRouteIds = null,
   }) {
@@ -81,6 +86,10 @@ class _$SettingsStateCopyWithImpl<$Res>
       isColorBlind: null == isColorBlind
           ? _self.isColorBlind
           : isColorBlind // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isDarkMode: null == isDarkMode
+          ? _self.isDarkMode
+          : isDarkMode // ignore: cast_nullable_to_non_nullable
               as bool,
       hasOnboarded: null == hasOnboarded
           ? _self.hasOnboarded
@@ -99,6 +108,7 @@ class _$SettingsStateCopyWithImpl<$Res>
 class _SettingsState implements SettingsState {
   const _SettingsState(
       {this.isColorBlind = false,
+      this.isDarkMode = false,
       this.hasOnboarded = false,
       final List<String> selectedRouteIds = const <String>[]})
       : _selectedRouteIds = selectedRouteIds;
@@ -106,6 +116,9 @@ class _SettingsState implements SettingsState {
   @override
   @JsonKey()
   final bool isColorBlind;
+  @override
+  @JsonKey()
+  final bool isDarkMode;
   @override
   @JsonKey()
   final bool hasOnboarded;
@@ -146,7 +159,7 @@ class _SettingsState implements SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(isColorBlind: $isColorBlind, hasOnboarded: $hasOnboarded, selectedRouteIds: $selectedRouteIds)';
+    return 'SettingsState(isColorBlind: $isColorBlind, isDarkMode: $isDarkMode, hasOnboarded: $hasOnboarded, selectedRouteIds: $selectedRouteIds)';
   }
 }
 
@@ -159,7 +172,10 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {bool isColorBlind, bool hasOnboarded, List<String> selectedRouteIds});
+      {bool isColorBlind,
+      bool isDarkMode,
+      bool hasOnboarded,
+      List<String> selectedRouteIds});
 }
 
 /// @nodoc
@@ -176,6 +192,7 @@ class __$SettingsStateCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   $Res call({
     Object? isColorBlind = null,
+    Object? isDarkMode = null,
     Object? hasOnboarded = null,
     Object? selectedRouteIds = null,
   }) {
@@ -183,6 +200,10 @@ class __$SettingsStateCopyWithImpl<$Res>
       isColorBlind: null == isColorBlind
           ? _self.isColorBlind
           : isColorBlind // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isDarkMode: null == isDarkMode
+          ? _self.isDarkMode
+          : isDarkMode // ignore: cast_nullable_to_non_nullable
               as bool,
       hasOnboarded: null == hasOnboarded
           ? _self.hasOnboarded

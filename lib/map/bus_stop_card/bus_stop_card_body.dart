@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:mbus/map/presentation/animations.dart';
-import 'package:mbus/constants.dart';
 import 'package:mbus/map/domain/data_types.dart';
+import 'package:mbus/theme/app_theme.dart';
+import 'package:mbus/map/widgets/three_line_list_item.dart';
 
 class BusStopCardBody extends StatelessWidget {
   final Future<List<IncomingBus>> future;
 
-  const BusStopCardBody({Key? key, required this.future}) : super(key: key);
+  const BusStopCardBody({super.key, required this.future});
 
   @override
   Widget build(BuildContext context) {
@@ -17,19 +18,20 @@ class BusStopCardBody extends StatelessWidget {
             return CardTextLoadingAnimation(5);
           } else {
             if (snapshot.hasData && snapshot.data != null) {
-              if (snapshot.data!.length == 0) {
+              if (snapshot.data!.isEmpty) {
                 return Container(
+                  margin: EdgeInsets.only(bottom: 16),
                   child: Text(
                     "No bus service to the stop at this time",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: AppTextStyles.bodyStrong,
                   ),
-                  margin: EdgeInsets.only(bottom: 16),
                 );
               }
               return Container(
                 child: Column(
-                  children:
-                      snapshot.data!.map((e) => BusArrivalDisplay(bus: e)).toList(),
+                  children: snapshot.data!
+                      .map((e) => BusArrivalDisplay(bus: e))
+                      .toList(),
                 ),
               );
             } else {
@@ -44,52 +46,22 @@ class BusStopCardBody extends StatelessWidget {
 class BusArrivalDisplay extends StatelessWidget {
   final IncomingBus bus;
 
-  const BusArrivalDisplay({Key? key, required this.bus}) : super(key: key);
+  const BusArrivalDisplay({super.key, required this.bus});
 
   String getArrivalText(String arrivalTime) {
     if (arrivalTime == "DUE") {
       return "Arriving within the next minute";
     } else {
-      return "In about ${arrivalTime} minutes";
+      return "In about $arrivalTime minutes";
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-      decoration: BoxDecoration(
-          border:
-              Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
-      child: (Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-              child: Text(
-            bus.route,
-            style: TextStyle(
-                color: MICHIGAN_BLUE,
-                fontWeight: FontWeight.w800,
-                fontSize: 16),
-          )),
-          Container(
-              child: Text(
-            getArrivalText(bus.estTimeMin),
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          )),
-          Row(
-            children: [
-              Flexible(
-                  child: Text(
-                "Towards ${bus.to} ",
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-              )),
-            ],
-          )
-        ],
-      )),
+    return ThreeLineListItem(
+      titleText: bus.route,
+      primaryText: getArrivalText(bus.estTimeMin),
+      metaText: "Towards ${bus.to} ",
     );
   }
 }
