@@ -268,7 +268,7 @@ class _MainMapState extends ConsumerState<MainMap> {
 
   StreamSubscription<repos.RouteSnapshot>? _routeSub;
   ProviderSubscription<SettingsState>? _settingsSubscription;
-  repos.RouteSnapshot? _lastSnapshot;
+  // removed unused _lastSnapshot; map rebuilds from stream
 
   @override
   void initState() {
@@ -310,14 +310,6 @@ class _MainMapState extends ConsumerState<MainMap> {
   BitmapDescriptor _getBusImage(String routeId) {
     final key = _busImages.containsKey(routeId) ? routeId : routeId.trim();
     return _busImages[key] ?? BitmapDescriptor.defaultMarker;
-  }
-
-  Set<T> _getSelectedData<T extends HasRouteId>(Set<T> data) {
-    final filtered = data
-        .where((element) => _selectedRouteIds.contains(element.routeId))
-        .toSet();
-
-    return filtered;
   }
 
   void _showBusStopCard(
@@ -492,7 +484,6 @@ class _MainMapState extends ConsumerState<MainMap> {
   void _setUpdateIntervals() {
     final repo = ref.read(routeRepositoryProvider);
     _routeSub = repo.stream.listen((snapshot) {
-      _lastSnapshot = snapshot;
       _mapData.routeLines.clear();
       _mapData.routeStops.clear();
       _setRoutesFromRepo(snapshot.allRoutes);
@@ -541,25 +532,7 @@ class _MainMapState extends ConsumerState<MainMap> {
     });
   }
 
-  Future<void> _refreshAssets({bool forceRouteInfo = false}) async {
-    final dpr = MediaQuery.of(context).devicePixelRatio;
-    await ref.read(assetsProvider.notifier).refreshAssets(
-        devicePixelRatio: dpr,
-        forceRouteInfo: forceRouteInfo,
-        settings: ref.read(settingsProvider));
-    _busImages = ref.read(markerImagesProvider);
-
-    if (_lastSnapshot != null) {
-      _mapData.routeLines.clear();
-      _mapData.routeStops.clear();
-      _setRoutesFromRepo(_lastSnapshot!.allRoutes);
-      _setBusesFromRepo(_lastSnapshot!.buses);
-    } else {
-      setState(() {
-        _rebuildSelectedMapFeatures();
-      });
-    }
-  }
+  // Manual asset refresh removed; assets react to settings changes
 
   @override
   Widget build(BuildContext context) {

@@ -53,3 +53,5 @@ app.*.map.json
 
 # iOS Google Maps SDK Configuration File
 ios/Flutter/gmap.xcconfig
+
+*.old

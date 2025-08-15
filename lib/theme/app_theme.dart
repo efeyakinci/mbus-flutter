@@ -86,6 +86,10 @@ class AppTheme {
   static ThemeData get lightTheme {
     final base = ThemeData.light(useMaterial3: false);
     return base.copyWith(
+      textTheme: base.textTheme.apply(
+        bodyColor: MICHIGAN_BLUE,
+        displayColor: MICHIGAN_BLUE,
+      ),
       scaffoldBackgroundColor: Colors.white,
       cardColor: Colors.white,
       primaryColor: Colors.white,
@@ -133,6 +137,10 @@ class AppTheme {
   static ThemeData get darkTheme {
     final base = ThemeData.dark(useMaterial3: false);
     return base.copyWith(
+      textTheme: base.textTheme.apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
       scaffoldBackgroundColor: const Color(0xFF121212),
       cardColor: const Color(0xFF1E1E1E),
       colorScheme: base.colorScheme.copyWith(

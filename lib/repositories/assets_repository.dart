@@ -1,10 +1,8 @@
 import 'dart:convert';
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:bitmap/bitmap.dart';
 import 'package:mbus/data/api_client.dart';
 import 'package:mbus/preferences_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,10 +46,10 @@ class AssetsRepository {
   }
 
   Future<BitmapDescriptor> _bitmapFromAsset(String assetPath,
-      {required int width}) async {
-    final image = await Bitmap.fromProvider(AssetImage(assetPath));
-    return BitmapDescriptor.fromBytes(
-        image.apply(BitmapResize.to(width: width)).buildHeaded());
+      {required int width, required double devicePixelRatio}) async {
+    final original = await rootBundle.load(assetPath);
+    return BitmapDescriptor.bytes(original.buffer.asUint8List(),
+        width: width.toDouble());
   }
 
   Future<Map<String, BitmapDescriptor>> loadBusImages({
@@ -59,24 +57,23 @@ class AssetsRepository {
     required int stopWidth,
     required Map<String, dynamic> routeIdToRouteName,
     required SettingsState settings,
+    required double devicePixelRatio,
   }) async {
     final images = <String, BitmapDescriptor>{};
-    images['BUS_STOP'] =
-        await _bitmapFromAsset('assets/bus_stop.png', width: stopWidth);
+    images['BUS_STOP'] = await _bitmapFromAsset('assets/bus_stop.png',
+        width: stopWidth, devicePixelRatio: devicePixelRatio);
 
     for (final routeIdentifier in routeIdToRouteName.keys) {
-      ImageProvider provider;
-      provider = CachedNetworkImageProvider(
-        "$BACKEND_URL/getVehicleImage/$routeIdentifier?colorblind=${settings.isColorBlind ? 'Y' : 'N'}",
-        errorListener: (_) {},
-      );
+      final url =
+          "$BACKEND_URL/getVehicleImage/$routeIdentifier?colorblind=${settings.isColorBlind ? 'Y' : 'N'}";
       try {
-        final bmp = await Bitmap.fromProvider(provider);
-        images[routeIdentifier] = BitmapDescriptor.fromBytes(
-            bmp.apply(BitmapResize.to(width: busWidth)).buildHeaded());
-      } catch (_) {
+        final file = await DefaultCacheManager().getSingleFile(url);
+        final original = await file.readAsBytes();
         images[routeIdentifier] =
-            await _bitmapFromAsset('assets/bus_blue.png', width: busWidth);
+            BitmapDescriptor.bytes(original, width: busWidth.toDouble());
+      } catch (_) {
+        images[routeIdentifier] = await _bitmapFromAsset('assets/bus_blue.png',
+            width: busWidth, devicePixelRatio: devicePixelRatio);
       }
     }
 

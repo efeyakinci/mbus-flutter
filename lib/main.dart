@@ -9,7 +9,6 @@ import 'package:logging/logging.dart';
 import 'package:mbus/favorites/presentation/favorites.dart';
 import 'package:mbus/map/presentation/main_map.dart';
 import 'package:mbus/onboarding/onboarding.dart';
-// import 'package:bitmap/bitmap.dart';
 import 'package:mbus/settings/presentation/settings.dart';
 import 'package:mbus/constants.dart';
 // import 'package:mbus/mbus_utils.dart';

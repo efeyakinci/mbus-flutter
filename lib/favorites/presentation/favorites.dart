@@ -248,8 +248,9 @@ class _FavoritesState extends ConsumerState<Favorites> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text("You don't seem to have any favorite stops.",
-                                style: AppTextStyles.pageTitle
-                                    .copyWith(fontSize: 36)),
+                                style: AppTextStyles.pageTitle.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
                             SizedBox(
                               height: 8,
                             ),

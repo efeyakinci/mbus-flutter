@@ -8,8 +8,7 @@ import 'package:mbus/about/about_screen.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/theme/app_theme.dart';
 
-const TITLE_STYLE =
-    TextStyle(color: MICHIGAN_BLUE, fontSize: 42, fontWeight: FontWeight.w900);
+const TITLE_STYLE = TextStyle(fontSize: 42, fontWeight: FontWeight.w900);
 const BODY_STYLE = AppTextStyles.body;
 
 class RouteButton extends StatelessWidget {
@@ -88,7 +87,7 @@ class _OnboardingTermsAndConditionsState
           isRead
               ? "By pressing next, you acknowledge that you have read and agreed to the terms and conditions and the privacy policy."
               : "Please read the terms and conditions to continue.",
-          style: BODY_STYLE.apply(fontWeightDelta: 3),
+          style: BODY_STYLE.copyWith(fontWeight: FontWeight.w600),
           textAlign: TextAlign.center,
         ),
       ],

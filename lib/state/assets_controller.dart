@@ -115,14 +115,15 @@ class AssetsController extends AsyncNotifier<AssetsState> {
         entry.key: Color(int.parse(entry.value.toString()))
     };
 
-    final busWidth = (devicePixelRatio * 40).toInt();
-    final stopWidth = (devicePixelRatio * 22).toInt();
+    final busWidth = 40;
+    final stopWidth = 22;
 
     final images = await _assetsRepository.loadBusImages(
       busWidth: busWidth,
       stopWidth: stopWidth,
       routeIdToRouteName: routeIdToName,
       settings: settings,
+      devicePixelRatio: devicePixelRatio,
     );
 
     if (myToken == _token) {
