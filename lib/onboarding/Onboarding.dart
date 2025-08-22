@@ -67,7 +67,7 @@ class _OnboardingTermsAndConditionsState
         const SizedBox(
           height: 24,
         ),
-        TextButton(
+        ElevatedButton(
             onPressed: () {
               widget.allowNext();
               setState(() {
@@ -76,10 +76,7 @@ class _OnboardingTermsAndConditionsState
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const TermsScreen()));
             },
-            child: const Text(
-              "Terms and Conditions",
-              style: AppTextStyles.body,
-            )),
+            child: const Text("Terms and Conditions")),
         const SizedBox(
           height: 24,
         ),
@@ -136,17 +133,24 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
           decoration: const PageDecoration(
               titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
           title: "Routes",
-          bodyWidget: RichText(
-            textAlign: TextAlign.center,
-            text: const TextSpan(
-                text: "Press the route button \n",
+          bodyWidget: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: const [
+              Text(
+                "Press the route button",
                 style: BODY_STYLE,
-                children: [
-                  WidgetSpan(child: RouteButton()),
-                  TextSpan(
-                      text:
-                          "\non the bottom right of the map to select what routes you'd like to view on the screen! You can simply swipe down on the route card to remove it from the screen.\n\nTip: Pressing and holding on a route allows you to only select that route!")
-                ]),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              RouteButton(),
+              SizedBox(height: 8),
+              Text(
+                "on the bottom right of the map to select what routes you'd like to view on the screen! You can simply swipe down on the route card to remove it from the screen.\n\nTip: Pressing and holding on a route allows you to only select that route!",
+                style: BODY_STYLE,
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
         PageViewModel(
@@ -161,21 +165,27 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             decoration: const PageDecoration(
               titleTextStyle: TITLE_STYLE,
             ),
-            bodyWidget: RichText(
-              textAlign: TextAlign.center,
-              text: const TextSpan(
-                  text: "You can tap on ",
+            bodyWidget: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: const [
+                Text(
+                  "You can tap on",
                   style: BODY_STYLE,
-                  children: [
-                    WidgetSpan(
-                        child: Image(
-                      image: AssetImage("assets/bus_stop.png"),
-                      height: 24.0,
-                    )),
-                    TextSpan(
-                        text:
-                            " icons in order to view upcoming stops at a bus station or to add the bus station to your favorites, after which you will be able to quickly view incoming buses to the stop inside the \"Favorites\" screen.\n\nTo return to the main map from any information card, just swipe down on the card!")
-                  ]),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8),
+                Image(
+                  image: AssetImage("assets/bus_stop.png"),
+                  height: 24.0,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  "icons in order to view upcoming stops at a bus station or to add the bus station to your favorites, after which you will be able to quickly view incoming buses to the stop inside the \"Favorites\" screen.\n\nTo return to the main map from any information card, just swipe down on the card!",
+                  style: BODY_STYLE,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             )),
         PageViewModel(
             image: SafeArea(
@@ -188,24 +198,30 @@ class _OnBoardingScreenState extends State<OnBoardingScreen> {
             title: "Buses",
             decoration: const PageDecoration(
                 titleTextStyle: TITLE_STYLE, bodyTextStyle: BODY_STYLE),
-            bodyWidget: RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                  text: "Icons that look like \n",
+            bodyWidget: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  "Icons that look like",
                   style: BODY_STYLE,
-                  children: [
-                    WidgetSpan(
-                        child: Transform.rotate(
-                      angle: pi / 2,
-                      child: const Image(
-                        image: AssetImage("assets/bus_blue.png"),
-                        width: 64.0,
-                      ),
-                    )),
-                    const TextSpan(
-                        text:
-                            "\nrepresent live positions of buses. Their colors match the color of their routes. To get more information about a bus, such as its route and next stops, you can tap its bus icon.")
-                  ]),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Transform.rotate(
+                  angle: pi / 2,
+                  child: const Image(
+                    image: AssetImage("assets/bus_blue.png"),
+                    width: 64.0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "represent live positions of buses. Their colors match the color of their routes. To get more information about a bus, such as its route and next stops, you can tap its bus icon.",
+                  style: BODY_STYLE,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             )),
         PageViewModel(
             image: SafeArea(

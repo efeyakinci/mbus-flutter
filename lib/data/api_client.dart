@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/data/api_errors.dart';
 
@@ -55,6 +58,10 @@ abstract class MBusApiClient {
   Future<int> getRouteInfoVersion();
   Future<Map<String, dynamic>> getStopPredictions(String stopId);
   Future<Map<String, dynamic>> getBusPredictions(String busId);
+  Future<Uint8List> getVehicleImageBytes({
+    required String routeId,
+    required bool colorblind,
+  });
 }
 
 class HttpMBusApiClient implements MBusApiClient {
@@ -90,8 +97,11 @@ class HttpMBusApiClient implements MBusApiClient {
   }
 
   @override
-  Future<RouteInformationDto> getRouteInformation({required bool colorblind}) async {
-    final json = await _getJson('getRouteInformation?colorblind=${colorblind ? 'Y' : 'N'}');
+  Future<RouteInformationDto> getRouteInformation(
+      {required bool colorblind}) async {
+    debugPrint("Getting route information");
+    final json = await _getJson(
+        'getRouteInformation?colorblind=${colorblind ? 'Y' : 'N'}');
     return RouteInformationDto(json);
   }
 
@@ -187,6 +197,15 @@ class HttpMBusApiClient implements MBusApiClient {
     if (body is Map<String, dynamic>) return body;
     throw ParseException('Invalid bus predictions payload');
   }
+
+  @override
+  Future<Uint8List> getVehicleImageBytes({
+    required String routeId,
+    required bool colorblind,
+  }) async {
+    final url =
+        "$BACKEND_URL/getVehicleImage/$routeId?colorblind=${colorblind ? 'Y' : 'N'}";
+    final file = await DefaultCacheManager().getSingleFile(url);
+    return file.readAsBytes();
+  }
 }
-
-

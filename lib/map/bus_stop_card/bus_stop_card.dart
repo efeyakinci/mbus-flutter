@@ -12,7 +12,7 @@ import 'package:mbus/map/presentation/card_scroll_behavior.dart';
 import 'package:mbus/data/providers.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/assets_providers.dart';
 
 import 'package:mbus/map/bus_stop_card/bus_stop_card_body.dart';
 import 'package:mbus/map/bus_stop_card/bus_stop_card_header.dart';

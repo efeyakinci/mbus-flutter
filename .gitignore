@@ -50,6 +50,7 @@ app.*.map.json
 
 # Generated files
 *.g.dart
+*.freezed.dart
 
 # iOS Google Maps SDK Configuration File
 ios/Flutter/gmap.xcconfig

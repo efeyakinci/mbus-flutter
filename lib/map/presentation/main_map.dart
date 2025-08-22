@@ -13,9 +13,9 @@ import 'package:mbus/settings/presentation/settings.dart';
 import 'package:mbus/constants.dart';
 import 'package:mbus/data/providers.dart';
 import 'package:mbus/map/infrastructure/route_repository.dart' as repos;
-import 'package:mbus/state/assets_controller.dart';
-import 'package:mbus/state/settings_controller.dart';
-import 'package:mbus/state/settings_state.dart';
+import 'package:mbus/state/assets_providers.dart';
+import 'package:mbus/state/settings_notifier.dart';
+import 'package:mbus/models/settings.dart' as app_settings;
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mbus/map/presentation/map_styles.dart';
@@ -214,7 +214,7 @@ class RouteChooser extends StatelessWidget {
                 backgroundColor:
                     Theme.of(context).bottomSheetTheme.backgroundColor,
                 builder: (context) {
-                  return SettingsCard(onRouteButtonClick);
+                  return const SettingsCard();
                 });
           },
           child: Container(
@@ -263,25 +263,41 @@ class _MainMapState extends ConsumerState<MainMap> {
   Set<Marker> _dynamicMarkers = {};
   Set<Polyline> _polylines = {};
   late Map<String, BitmapDescriptor> _busImages;
+  Set<String> _favoriteStopIds = {};
   bool _showMyLocation = false;
   double _curMapRotation = 0;
+  double? _lastDevicePixelRatio;
 
   StreamSubscription<repos.RouteSnapshot>? _routeSub;
-  ProviderSubscription<SettingsState>? _settingsSubscription;
+  ProviderSubscription<app_settings.Settings>? _settingsSubscription;
+  ProviderSubscription<Map<String, BitmapDescriptor>>?
+      _markerImagesSubscription;
+  ProviderSubscription<bool>? _colorBlindSubscription;
+  ProviderSubscription<
+      ({
+        Map<String, Color> routeColors,
+        Map<String, dynamic> routeIdToName
+      })>? _routeMetaSubscription;
+  ProviderSubscription<AsyncValue<Set<String>>>? _favoritesSubscription;
   // removed unused _lastSnapshot; map rebuilds from stream
 
   @override
   void initState() {
     super.initState();
-    _selectedRouteIds = ref.read(settingsProvider).selectedRouteIds.toSet();
+    _selectedRouteIds =
+        ref.read(settingsNotifierProvider).selectedRouteIds.toSet();
     _busImages = ref.read(markerImagesProvider);
+    _favoriteStopIds = ref.read(favoriteStopsProvider).maybeWhen(
+          data: (s) => s,
+          orElse: () => <String>{},
+        );
 
     _rebuildSelectedMapFeatures();
     _setUpdateIntervals();
     _checkLocationPermission();
 
-    _settingsSubscription = ref.listenManual<SettingsState>(
-      settingsProvider,
+    _settingsSubscription = ref.listenManual<app_settings.Settings>(
+      settingsNotifierProvider,
       (prev, next) {
         setState(() {
           _selectedRouteIds = next.selectedRouteIds.toSet();
@@ -289,6 +305,39 @@ class _MainMapState extends ConsumerState<MainMap> {
         });
       },
     );
+
+    _markerImagesSubscription = ref.listenManual<Map<String, BitmapDescriptor>>(
+      markerImagesProvider,
+      (prev, next) {
+        _busImages = next;
+        // marker images updated; rebuilding icons
+        _applyNewBusIcons();
+      },
+    );
+
+    _favoritesSubscription = ref.listenManual<AsyncValue<Set<String>>>(
+      favoriteStopsProvider,
+      (prev, next) {
+        final data = next.maybeWhen(
+          data: (s) => s,
+          orElse: () => null,
+        );
+        if (data != null) {
+          _favoriteStopIds = data;
+          _buildStaticMarkers();
+          setState(() {});
+        }
+      },
+    );
+
+    _routeMetaSubscription = ref.listenManual(
+      routeMetaProvider,
+      (prev, next) {
+        _applyNewRouteColors(next.routeColors);
+      },
+    );
+
+    // assetsSnapshotProvider already depends on colorblind; no manual refresh needed
   }
 
   @override
@@ -297,8 +346,27 @@ class _MainMapState extends ConsumerState<MainMap> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    if (_lastDevicePixelRatio != dpr) {
+      _lastDevicePixelRatio = dpr;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final notifier = ref.read(devicePixelRatioProvider.notifier);
+        if (notifier.state != dpr) {
+          notifier.state = dpr;
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _settingsSubscription?.close();
+    _markerImagesSubscription?.close();
+    _routeMetaSubscription?.close();
+    _colorBlindSubscription?.close();
+    _favoritesSubscription?.close();
     _routeSub?.cancel();
     super.dispose();
   }
@@ -310,6 +378,57 @@ class _MainMapState extends ConsumerState<MainMap> {
   BitmapDescriptor _getBusImage(String routeId) {
     final key = _busImages.containsKey(routeId) ? routeId : routeId.trim();
     return _busImages[key] ?? BitmapDescriptor.defaultMarker;
+  }
+
+  void _applyNewBusIcons() {
+    if (_mapData.buses.isNotEmpty) {
+      final updated = <MBus>{};
+      for (final b in _mapData.buses) {
+        final m = b.marker;
+        final newMarker = Marker(
+          zIndex: m.zIndex,
+          anchor: m.anchor,
+          markerId: m.markerId,
+          position: m.position,
+          icon: _getBusImage(b.routeId),
+          rotation: m.rotation,
+          onTap: m.onTap,
+          consumeTapEvents: m.consumeTapEvents,
+        );
+        updated.add(MBus(b.routeId, newMarker));
+      }
+      _mapData.buses
+        ..clear()
+        ..addAll(updated);
+    }
+    _rebuildSelections();
+    _buildDynamicMarkers();
+    _buildStaticMarkers();
+    setState(() {});
+  }
+
+  void _applyNewRouteColors(Map<String, Color> colors) {
+    if (_mapData.routeLines.isNotEmpty) {
+      final updated = <BusRoute>{};
+      for (final r in _mapData.routeLines) {
+        final old = r.polyline;
+        final base = colors[r.routeId] ?? old.color;
+        final newColor = base.withAlpha(old.color.alpha);
+        final newPolyline = Polyline(
+          polylineId: old.polylineId,
+          points: old.points,
+          width: old.width,
+          color: newColor,
+        );
+        updated.add(BusRoute(r.routeId, newPolyline));
+      }
+      _mapData.routeLines
+        ..clear()
+        ..addAll(updated);
+      _rebuildSelections();
+      _buildPolylines();
+      setState(() {});
+    }
   }
 
   void _showBusStopCard(
@@ -430,11 +549,13 @@ class _MainMapState extends ConsumerState<MainMap> {
   }
 
   Marker _markerFromBusStop(BusStop stop) {
+    final isFav = _favoriteStopIds.contains(stop.stopId);
+    final iconKey = isFav ? "BUS_STOP_FAV" : "BUS_STOP";
     return Marker(
         anchor: const Offset(0.5, 0.5),
         markerId: MarkerId(stop.stopId),
         position: stop.location,
-        icon: _getBusImage("BUS_STOP"),
+        icon: _getBusImage(iconKey),
         consumeTapEvents: true,
         onTap: () => _showBusStopCard(
             stop.stopId, stop.stopName, stop.routeId, stop.location));
@@ -524,10 +645,11 @@ class _MainMapState extends ConsumerState<MainMap> {
     }
   }
 
-  void _onRouteChooserClick(Set<RouteData> newRoutes) {
+  void _onRouteChooserClick(Set<RouteData> newRoutes) async {
+    final ids = newRoutes.map((route) => route.routeId).toSet();
+    await ref.read(settingsNotifierProvider.notifier).setSelectedRouteIds(ids);
     setState(() {
-      _selectedRouteIds = newRoutes.map((route) => route.routeId).toSet();
-      ref.read(settingsProvider.notifier).setSelectedRoutes(_selectedRouteIds);
+      _selectedRouteIds = ids;
       _rebuildSelectedMapFeatures();
     });
   }

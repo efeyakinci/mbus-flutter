@@ -18,12 +18,11 @@ import 'package:mbus/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:mbus/models/route_data.dart';
 import 'package:mbus/data/providers.dart';
-import 'package:mbus/repositories/settings_repository.dart';
 import 'package:mbus/services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/assets_providers.dart';
 import 'package:mbus/state/navigation.dart';
-import 'package:mbus/state/settings_controller.dart';
+import 'package:mbus/state/settings_notifier.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +40,7 @@ Future<void> main() async {
       navigatorKeyProvider.overrideWithValue(navKey),
       sharedPreferencesProvider.overrideWith((ref) async => prefs),
       streamingSharedPreferencesProvider.overrideWith((ref) async => sprefs),
-      settingsRepositoryProvider.overrideWithValue(SettingsRepository(sprefs)),
+      // settings repository removed; keep providers for prefs only
     ],
     child: MyApp(navigatorKey: navKey),
   ));
@@ -53,7 +52,7 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = ref.watch(settingsProvider).isDarkMode;
+    final isDark = ref.watch(settingsNotifierProvider).isDarkMode;
     return MaterialApp(
       title: 'MBus',
       debugShowCheckedModeBanner: false,
@@ -82,7 +81,7 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
   final NotificationService _notificationService = NotificationService();
 
   Future<void> _checkIfOnboarded() async {
-    final onboarded = ref.read(settingsProvider).hasOnboarded;
+    final onboarded = ref.read(settingsNotifierProvider).hasOnboarded;
     setState(() {
       _hasBeenOnboarded = onboarded;
     });
@@ -99,14 +98,14 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
         permission = await Geolocator.requestPermission();
       }
     }
-    ref.read(settingsProvider.notifier).setOnboarded(true);
+    await ref.read(settingsNotifierProvider.notifier).setHasOnboarded(true);
     setState(() {
       _hasBeenOnboarded = true;
     });
   }
 
   Future<void> getSelectedRoutes() async {
-    final ids = ref.read(settingsProvider).selectedRouteIds;
+    final ids = ref.read(settingsNotifierProvider).selectedRouteIds;
     final idToName = ref.read(routeMetaProvider).routeIdToName;
     setState(() {
       selectedRoutes = ids
@@ -119,9 +118,7 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      final dpr = MediaQuery.of(context).devicePixelRatio;
-      ref.read(assetsProvider.notifier).refreshAssets(
-          devicePixelRatio: dpr, settings: ref.read(settingsProvider));
+      // Snapshot depends on colorblind/version; consumers will refresh as needed
       _notificationService.checkMessages(context);
     }
   }
@@ -132,10 +129,8 @@ class _OnBoardingSwitcherState extends ConsumerState<OnBoardingSwitcher>
       _checkIfOnboarded(),
       _notificationService.checkUpdateNotes(context),
     ]);
-    // Initialize Riverpod assets (route metadata + marker images)
-    final dpr = MediaQuery.of(context).devicePixelRatio;
-    await ref.read(assetsProvider.notifier).refreshAssets(
-        devicePixelRatio: dpr, settings: ref.read(settingsProvider));
+    // Initialize assets (route metadata + marker images)
+    await ref.read(assetsSnapshotProvider.future);
     setState(() {
       _isLoaded = true;
     });

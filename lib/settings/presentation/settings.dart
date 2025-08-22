@@ -13,8 +13,8 @@ import 'package:mbus/constants.dart';
 import 'package:flutter_phoenix/flutter_phoenix.dart';
 import 'package:mbus/data/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mbus/state/assets_controller.dart';
-import 'package:mbus/state/settings_controller.dart';
+import 'package:mbus/state/assets_providers.dart';
+import 'package:mbus/state/settings_notifier.dart';
 import 'package:mbus/models/route_data.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -148,15 +148,15 @@ class Settings extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
+    final settings = ref.watch(settingsNotifierProvider);
     return _SettingsContent(
       colorblindModeIsEnabled: settings.isColorBlind,
       darkModeIsEnabled: settings.isDarkMode,
-      onToggleColorblind: () {
-        ref.read(settingsProvider.notifier).toggleColorBlind();
+      onToggleColorblind: () async {
+        await ref.read(settingsNotifierProvider.notifier).toggleColorBlind();
       },
-      onToggleDarkMode: () {
-        ref.read(settingsProvider.notifier).toggleDarkMode();
+      onToggleDarkMode: () async {
+        await ref.read(settingsNotifierProvider.notifier).toggleDarkMode();
       },
     );
   }
@@ -282,34 +282,45 @@ class _SettingsContent extends StatelessWidget {
   }
 }
 
-class SelectableBusRoute extends StatelessWidget {
-  final String name;
-  final Color routeColor;
-  final bool selected;
-  final VoidCallback onClick;
-  final VoidCallback onLongClick;
+class SelectableBusRoute extends ConsumerWidget {
+  final RouteData route;
 
-  const SelectableBusRoute(
-      this.name, this.selected, this.onClick, this.onLongClick, this.routeColor,
-      {super.key});
+  const SelectableBusRoute({super.key, required this.route});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsNotifierProvider);
+    final isSelected = settings.selectedRouteIds.contains(route.routeId);
+    final routeColor = ref.read(routeMetaProvider).routeColors[route.routeId] ??
+        const Color(0x00000000);
+
+    Future<void> handleTap() async {
+      final notifier = ref.read(settingsNotifierProvider.notifier);
+      if (isSelected) {
+        await notifier.removeSelectedRouteId(route.routeId);
+      } else {
+        await notifier.addSelectedRouteId(route.routeId);
+      }
+    }
+
+    Future<void> handleLongPress() async {
+      final notifier = ref.read(settingsNotifierProvider.notifier);
+      await notifier.setSelectedRouteIds({route.routeId});
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator == true) {
+        Vibration.vibrate(duration: 50);
+      }
+    }
+
     return GestureDetector(
-      onTap: onClick,
-      onLongPress: () async {
-        onLongClick();
-        final hasVibrator = await Vibration.hasVibrator();
-        if (hasVibrator == true) {
-          Vibration.vibrate(duration: 50);
-        }
-      },
+      onTap: handleTap,
+      onLongPress: handleLongPress,
       child: (Container(
         width: double.infinity,
         margin: EdgeInsets.fromLTRB(0, 0, 0, 16),
         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         decoration: BoxDecoration(
-            color: selected
+            color: isSelected
                 ? (Theme.of(context).brightness == Brightness.dark
                     ? const Color(0xFF3A3000)
                     : const Color(0xFFffdf63))
@@ -324,7 +335,7 @@ class SelectableBusRoute extends StatelessWidget {
                   blurRadius: 4,
                   offset: Offset(-2, -2)),
               BoxShadow(
-                  color: selected
+                  color: isSelected
                       ? (Theme.of(context).brightness == Brightness.dark
                           ? const Color(0xFF5A4700)
                           : const Color(0xFFD9B83C))
@@ -347,7 +358,7 @@ class SelectableBusRoute extends StatelessWidget {
                   margin: EdgeInsets.only(right: 15),
                 ),
                 Text(
-                  name,
+                  route.routeName,
                   style: AppTextStyles.body
                       .copyWith(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
@@ -355,7 +366,7 @@ class SelectableBusRoute extends StatelessWidget {
             ),
             Align(
               alignment: Alignment.centerRight,
-              child: Icon(selected ? Icons.check : Icons.add),
+              child: Icon(isSelected ? Icons.check : Icons.add),
             ),
           ],
         ),
@@ -364,51 +375,12 @@ class SelectableBusRoute extends StatelessWidget {
   }
 }
 
-class SettingsCard extends ConsumerStatefulWidget {
-  final Function(Set<RouteData>) setSelectedRoutes;
+class SettingsCard extends ConsumerWidget {
+  const SettingsCard({super.key});
 
-  const SettingsCard(this.setSelectedRoutes, {super.key});
-  @override
-  _SettingsCardState createState() => _SettingsCardState();
-}
-
-class _SettingsCardState extends ConsumerState<SettingsCard> {
-  List<RouteData> _routes = [];
-  Set<RouteData> selectedRoutes = {};
-  late SharedPreferences prefs;
-
-  void _toggleRoute(RouteData route) {
-    setState(() {
-      final hasId = selectedRoutes.any((r) => r.routeId == route.routeId);
-      if (hasId) {
-        selectedRoutes.removeWhere((r) => r.routeId == route.routeId);
-      } else {
-        selectedRoutes.add(route);
-      }
-      widget.setSelectedRoutes(Set.from(selectedRoutes));
-      ref
-          .read(settingsProvider.notifier)
-          .setSelectedRoutes(selectedRoutes.map((e) => e.routeId).toSet());
-    });
-  }
-
-  void _onlySelectRoute(RouteData route) {
-    setState(() {
-      selectedRoutes.clear();
-      selectedRoutes.add(route);
-      widget.setSelectedRoutes(Set.from(selectedRoutes));
-      ref.read(settingsProvider.notifier).setSelectedRoutes({route.routeId});
-    });
-  }
-
-  void _getRouteNames() async {
-    if (!mounted) return;
-    prefs = await SharedPreferences.getInstance();
-    final selectedIds = ref.read(settingsProvider).selectedRouteIds;
-    final idToName = ref.read(routeMetaProvider).routeIdToName;
-    selectedRoutes = selectedIds
-        .map((id) => RouteData(routeId: id, routeName: idToName[id] ?? id))
-        .toSet();
+  Future<List<RouteData>> _loadRoutes(
+      BuildContext context, WidgetRef ref) async {
+    final prefs = await SharedPreferences.getInstance();
     final cachedSelections = prefs.getStringList('cachedSelections');
     List? routesJson;
     if (cachedSelections != null &&
@@ -423,86 +395,77 @@ class _SettingsCardState extends ConsumerState<SettingsCard> {
       final api = ProviderScope.containerOf(context, listen: false)
           .read(apiClientProvider);
       routesJson = (await api.getSelectableRoutes()).routes;
-      prefs.setStringList('cachedSelections', [
+      await prefs.setStringList('cachedSelections', [
         jsonEncode({
           'bustime-response': {'routes': routesJson}
         }),
         DateTime.now().toString()
       ]);
     }
-    if (routesJson != null) {
-      setState(() {
-        _routes = routesJson!
-            .map((e) => RouteData(routeId: e['rt'], routeName: e['rtnm']))
-            .toList()
-            .cast<RouteData>();
-      });
-    }
+    if (routesJson == null) return [];
+    return routesJson
+        .map((e) => RouteData(routeId: e['rt'], routeName: e['rtnm']))
+        .toList()
+        .cast<RouteData>();
   }
 
   @override
-  void initState() {
-    super.initState();
-    _getRouteNames();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       child: ScrollConfiguration(
         behavior: CardScrollBehavior(),
-        child: (ListView(
-            controller: ModalScrollController.of(context),
-            padding: EdgeInsets.all(16),
-            children: [
-              Text(
-                "Select Routes",
-                style: SETTINGS_TITLE_STYLE.copyWith(
-                    color: Theme.of(context).colorScheme.primary),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "Tip: Long press a route to only show that route",
-                style: AppTextStyles.body
-                    .copyWith(color: Colors.grey, fontSize: 14),
-              ),
-              Divider(),
-              SizedBox(height: 16),
-              if (_routes.isEmpty) CupertinoActivityIndicator(),
-              ..._routes.map((e) => SelectableBusRoute(e.routeName,
-                      selectedRoutes.any((r) => r.routeId == e.routeId), () {
-                    _toggleRoute(e);
-                  }, () {
-                    _onlySelectRoute(e);
-                  },
-                      ref.read(routeMetaProvider).routeColors[e.routeId] ??
-                          Color(0x00000000))),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ActionChip(
-                    onPressed: Navigator.of(context).pop,
-                    avatar: Icon(
-                      Icons.map,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    label: Text(
-                      "Back to Map",
-                      style: AppTextStyles.routeDirectionBlue.copyWith(
-                          color: Theme.of(context).colorScheme.primary),
-                    ),
-                    backgroundColor: Colors.transparent,
-                    shape: StadiumBorder(
-                        side: BorderSide(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.grey.shade700
-                                    : Colors.grey.shade400)),
-                  )
-                ],
-              )
-            ])),
+        child: FutureBuilder<List<RouteData>>(
+          future: _loadRoutes(context, ref),
+          builder: (context, snap) {
+            final routes = snap.data ?? const <RouteData>[];
+            return ListView(
+              controller: ModalScrollController.of(context),
+              padding: EdgeInsets.all(16),
+              children: [
+                Text(
+                  "Select Routes",
+                  style: SETTINGS_TITLE_STYLE.copyWith(
+                      color: Theme.of(context).colorScheme.primary),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Tip: Long press a route to only show that route",
+                  style: AppTextStyles.body
+                      .copyWith(color: Colors.grey, fontSize: 14),
+                ),
+                Divider(),
+                SizedBox(height: 16),
+                if (!snap.hasData) CupertinoActivityIndicator(),
+                ...routes.map((e) => SelectableBusRoute(route: e)),
+                SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ActionChip(
+                      onPressed: Navigator.of(context).pop,
+                      avatar: Icon(
+                        Icons.map,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      label: Text(
+                        "Back to Map",
+                        style: AppTextStyles.routeDirectionBlue.copyWith(
+                            color: Theme.of(context).colorScheme.primary),
+                      ),
+                      backgroundColor: Colors.transparent,
+                      shape: StadiumBorder(
+                          side: BorderSide(
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade400)),
+                    )
+                  ],
+                )
+              ],
+            );
+          },
+        ),
       ),
     );
   }

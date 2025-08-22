@@ -5,6 +5,12 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    require(f.exists()) { "Missing key.properties at ${f.absolutePath}" }
+    f.inputStream().use { load(it) }
+}
+
 val googlemapsApiKey: String = localProps.getProperty("googlemaps.apiKey")
 
 plugins {
@@ -41,11 +47,27 @@ android {
         manifestPlaceholders["googlemaps.apiKey"] = googlemapsApiKey
 }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProps.getProperty("storeFile")
+                ?: error("'storeFile' is missing in key.properties")
+            val storePasswordValue = keystoreProps.getProperty("storePassword")
+                ?: error("'storePassword' is missing in key.properties")
+            val keyAliasValue = keystoreProps.getProperty("keyAlias")
+                ?: error("'keyAlias' is missing in key.properties")
+            val keyPasswordValue = keystoreProps.getProperty("keyPassword")
+                ?: error("'keyPassword' is missing in key.properties")
+
+            storeFile = file(storeFilePath)
+            storePassword = storePasswordValue
+            keyAlias = keyAliasValue
+            keyPassword = keyPasswordValue
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

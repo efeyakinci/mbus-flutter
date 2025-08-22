@@ -11,7 +11,7 @@ import 'package:mbus/map/domain/data_types.dart';
 import 'package:mbus/map/favorite_button.dart';
 import 'package:mbus/data/providers.dart';
 import 'package:mbus/data/api_errors.dart';
-import 'package:mbus/state/assets_controller.dart';
+import 'package:mbus/state/assets_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
@@ -396,7 +396,9 @@ class _FavoriteStopArrivalsDisplay extends StatelessWidget {
               Flexible(
                   child: Text(
                 "Towards ${bus.to} ",
-                style: AppTextStyles.routeDirectionBlue,
+                style: AppTextStyles.routeMeta.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color ??
+                        Colors.grey),
               )),
             ],
           )
